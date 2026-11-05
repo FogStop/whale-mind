@@ -1,0 +1,954 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>whale-mind · V1 拟真大脑（记忆通路 · 蓝）</title>
+<style>
+  html,body{margin:0;height:100%;background:#030711;color:#dfe8f2;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;overflow:hidden}
+  #stage{position:fixed;inset:0}
+.hud{position:fixed;left:18px;top:16px;z-index:10;pointer-events:none;
+    max-width:min(calc(100% - 380px), 720px)}   /* 给右侧 308px 账单卡留位，不压标题 */
+.hud h1{font-size:17px;margin:0 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud p{font-size:12px;color:#7e96b5;margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .trace{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:10;pointer-events:none;
+    font-family:Consolas,"Courier New",monospace;font-size:13px;color:#bfe8ff;background:rgba(6,18,36,.85);
+    border:1px solid rgba(78,203,255,.35);border-radius:8px;padding:7px 16px;backdrop-filter:blur(6px);white-space:nowrap;
+    max-width:calc(100% - 40px);overflow:hidden;text-overflow:ellipsis}
+  /* 嵌进 DSH 的 620px 卡片后画面变窄：trace 不再居中悬浮，改为贴着 HUD 下方一行，
+     否则会压住左上角标题。全屏预览（宽 >1100）仍保持原来的居中悬浮。 */
+  @media (max-width:1100px){
+    .trace{left:18px;transform:none;top:auto;bottom:56px;font-size:12px}
+    .hud p{display:none}
+  }
+  /* 窄卡片（≤780）：右侧信息栏太占地方，会盖住标签、按钮还会换行。
+     缩成顶栏两行 + 去掉执行日志，只留数字；日志在宽屏才看得下。 */
+  @media (max-width:780px){
+    /* 窄卡片：右侧信息栏退化为底部横条，执行日志让位给画面 */
+    .meters{left:14px !important;right:14px !important;top:auto !important;bottom:100px !important;
+      width:auto !important;font-size:11px;padding:7px 10px}
+    .ops{display:none !important}
+    .ctrl{left:14px !important;right:14px !important;bottom:14px !important;gap:6px}
+    .ctrl button{padding:7px 11px;font-size:12px}
+    .legend{display:none !important}
+    .trace{bottom:auto !important;top:54px !important;font-size:11px;max-width:calc(100% - 28px)}
+    .hud h1{font-size:14px}
+  }
+  .trace b{color:#fff}
+  .trace .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#4ecbff;box-shadow:0 0 8px #4ecbff;margin-right:8px;animation:blink 1s infinite}
+  @keyframes blink{50%{opacity:.3}}
+  .ctrl{position:fixed;left:18px;bottom:18px;z-index:10;display:flex;gap:8px;flex-wrap:wrap}
+  .ctrl button{background:rgba(10,26,48,.85);color:#dfe8f2;border:1px solid #1c3a58;border-radius:8px;padding:9px 15px;cursor:pointer;font-size:13px;backdrop-filter:blur(6px)}
+  .ctrl button:hover{border-color:#4ecbff;box-shadow:0 0 12px rgba(78,203,255,.35)}
+  .ctrl button.on{border-color:#4ecbff;color:#4ecbff;box-shadow:0 0 14px rgba(78,203,255,.4)}
+  .meters{position:fixed;right:18px;top:16px;z-index:10;width:308px;font-size:11.5px;color:#7e96b5;font-variant-numeric:tabular-nums;pointer-events:none;
+    background:linear-gradient(180deg,rgba(6,16,32,.85),rgba(6,16,32,.55));border:1px solid rgba(78,203,255,.26);border-radius:10px;padding:9px 12px;backdrop-filter:blur(6px)}
+  .meters .cap{font-size:10.5px;letter-spacing:.14em;color:#5f8aa8;margin-bottom:4px}
+  .meters b{color:#dfe8f2;font-weight:600}
+  .meters .gold{color:#4ecbff}.meters .blue{color:#7bdff2}.meters .pink{color:#8fb4ff}
+  .moodbar{display:inline-block;letter-spacing:1px;color:#1d3350}
+  .moodbar i{font-style:normal;color:#8fb4ff}
+  .ops{position:fixed;right:18px;top:118px;z-index:10;width:308px;pointer-events:none;font-family:Consolas,"Courier New",monospace;
+    background:linear-gradient(180deg,rgba(6,16,32,.85),rgba(6,16,32,.55));border:1px solid rgba(78,203,255,.26);border-radius:10px;padding:9px 12px 7px;backdrop-filter:blur(6px)}
+  .ops:before{content:'◤';position:absolute;left:6px;top:4px;color:#4ecbff;font-size:10px}
+  .ops .cap{font-size:10.5px;letter-spacing:.14em;color:#5f8aa8;margin:0 0 5px 10px}
+  .fe{display:flex;align-items:center;gap:7px;font-size:11.5px;line-height:1.85;color:#c9dbe8;animation:slidein .28s ease}
+  .fe i{flex:none;width:8px;height:8px;border-radius:50%}
+  .fe span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fe time{flex:none;color:#5f7a99;font-size:10.5px}
+  .fe.dim{opacity:.45}
+  /* 记忆事件流：谁记了什么。来源角标让「本地手记」和「大飞鱼」一眼分开。
+     只留最新 3 条 —— 原来 8 条挤成一片，看着费劲。行高也放宽一点。 */
+  .ev{display:flex;align-items:baseline;gap:6px;font-size:11.5px;line-height:2.0;color:#c9dbe8;padding:3px 0}
+  .ev span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ev time{flex:none;color:#5f7a99;font-size:10px}
+  .ev .src{flex:none;font-style:normal;font-size:9.5px;padding:0 4px;border-radius:3px;letter-spacing:.02em}
+  .ev .src.dy{color:#ffd08a;background:rgba(200,140,40,.18);border:1px solid rgba(220,160,60,.35)}
+  .ev .src.lo{color:#8fc8ef;background:rgba(60,120,180,.16);border:1px solid rgba(80,150,210,.3)}
+  .ev.empty{color:#5f7a99;font-size:10.5px}
+  @keyframes slidein{from{transform:translateX(14px);opacity:0}to{transform:none;opacity:1}}
+  .legend{position:fixed;left:18px;top:74px;z-index:10;font-size:12px;color:#7e96b5;pointer-events:none}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 4px 0 10px}
+  #err{position:fixed;inset:auto 18px 18px 50%;display:none;background:rgba(120,20,20,.9);padding:10px 14px;border-radius:8px;font-size:12px;z-index:99}
+  /* 通路标签用 HTML 叠层：Sprite 在深度压缩的脑体里投影会全挤到中心，
+     DOM 标签能自由排版、还能做防重叠。引线用 SVG 画。 */
+  #labels,#leaders{position:fixed;inset:0;z-index:8;pointer-events:none}
+  #labels .nl{position:absolute;transform:translate(-50%,-50%);text-align:center;white-space:nowrap;
+    font-family:"Microsoft YaHei",sans-serif;transition:opacity .25s}
+  #labels .nl b{display:block;font-size:11.5px;font-weight:600;color:#d6f0ff;letter-spacing:.04em;
+    text-shadow:0 0 10px rgba(78,203,255,.85),0 0 22px rgba(40,120,200,.6)}
+  #labels .nl em{display:block;font-style:normal;font-size:7.5px;letter-spacing:.12em;color:rgba(150,195,230,.72);
+    font-family:Consolas,monospace;margin-top:1px}
+  #labels .nl s{display:block;text-decoration:none;font-size:9px;color:rgba(140,190,230,.9);margin-top:1px}
+  #labels .nl.on b{color:#fff;text-shadow:0 0 14px rgba(160,225,255,1),0 0 30px rgba(78,203,255,.9)}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<svg id="leaders" xmlns="http://www.w3.org/2000/svg"><g stroke="#5aa6dd" stroke-width="1" opacity=".55"></g></svg>
+<div id="labels"></div>
+<div class="hud"><h1>whale-mind · V1 拟真大脑（记忆通路 · 蓝）</h1><p>皮层结构 · 神经纤维束 · <b style="color:#4ecbff">记忆通路：海马体→穹窿→乳头体→丘脑→扣带回→前额叶→内嗅皮层</b> · 通路以浅粒子流标出 · 执行时标注命令与所到之处 · 拖拽 / 缩放</p></div>
+<div class="legend">
+  <span><i style="background:#4ecbff"></i>记忆通路</span>
+  <span><i style="background:#8fb4ff"></i>纤维束</span>
+  <span><i style="background:#dff3ff"></i>执行脉冲</span>
+</div>
+<div class="trace" id="trace"><span class="dot"></span>待机 · 等待记忆事件</div>
+<div class="meters" id="meters"></div>
+<div class="ops"><div class="cap">执行日志 · EXEC LOG</div><div id="feed"></div>
+  <div class="cap" style="margin-top:8px">记忆事件 · 谁记了什么</div><div id="evlist"></div></div>
+<div class="ctrl">
+  <button id="b-write">✍ 写入（海马体 → 环路送存）</button>
+  <button id="b-recall">💡 回忆（全环传导）</button>
+  <button id="b-forget">🍂 遗忘（降级）</button>
+  <button id="b-gate">⏱ 门控（杏仁核）</button>
+  <button id="b-auto" class="on">⏸ 自动演示</button>
+  <button id="b-refresh">🔄 刷新真实数据</button>
+</div>
+<div id="err"></div>
+<script>window.addEventListener('error', e => { const d = document.getElementById('err'); d.style.display = 'block'; d.textContent = '加载失败：' + (e.message || e) + '（需要联网加载 Three.js CDN）'; });</script>
+<script type="importmap">
+{ "imports": { "three": "/whale-mind/panel/vendor/three.module.min.js", "three/addons/": "/whale-mind/panel/vendor/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* ================= 记忆事件总线 + 账单 HUD ================= */
+const feedEl = document.getElementById('feed');
+const metersEl = document.getElementById('meters');
+const traceEl = document.getElementById('trace');
+const OPS = (() => {
+  const PRICE = 0.001;
+  // 这些数字起手就是 0，等真实数据回来再覆盖 —— 绝不拿写死的假值骗自己。
+  let gate = 0, cons = 0, tok = 0, mood = 0.2, memories = 0;
+  const META = {
+    write:  { icon: '✍', c: '#4ecbff', t: 900 },
+    recall: { icon: '💡', c: '#7bdff2', t: 0 },
+    forget: { icon: '🍂', c: '#8fa7bd', t: 120 },
+    decay:  { icon: '🌙', c: '#667788', t: 0 },
+    gate:   { icon: '⏱', c: '#8fb4ff', t: 260 }
+  };
+  function moodWord(v) { return v >= 0.5 ? '开心' : v >= 0.15 ? '平静偏暖' : v > -0.15 ? '平静' : v > -0.5 ? '低落' : '难过'; }
+  function moodBar(v) {
+    const n = Math.round(((v + 1) / 2) * 12);
+    return '<span class="moodbar">' + '▮'.repeat(n) + '<i>' + '▮'.repeat(12 - n) + '</i></span>';
+  }
+  function render() {
+    metersEl.innerHTML =
+      `<div class="cap">账单 · BILLING</div>` +
+      `门控 <b>${gate}</b> 次 ×260t · 固化 <b class="gold">${cons}</b> 次 ×900t · 检索 <b class="blue">0t</b>（本地）<br>` +
+      `插件累计 <b>${tok.toLocaleString()}</b> t ≈ <b class="gold">¥${(tok * PRICE / 1000).toFixed(3)}</b>` +
+      ` <span style="color:#5f7a99">｜ 对话本体 ≈18,000t/轮 ≈ ¥0.018</span><br>` +
+      `💗 情绪 <b class="pink">${moodWord(mood)}</b> ${moodBar(mood)} ｜ 记忆 <b>${memories}</b> 条`;
+  }
+  function emit(type, label) {
+    const m = META[type] || META.gate;
+    if (type === 'gate') gate++;
+    tok += m.t;
+    // memories 不再自增/自减：它只反映磁盘上真实存在的条数（由 seed/刷新写入）。
+    // 演示通路只演「过程」，不许伪造「库存」。
+    mood += type === 'write' ? 0.12 : type === 'recall' ? 0.04 : type === 'forget' ? -0.08 : type === 'decay' ? -0.04 : 0;
+    mood = Math.max(-1, Math.min(1, mood));
+    const d = new Date();
+    const ts = [d.getHours(), d.getMinutes(), d.getSeconds()].map(x => String(x).padStart(2, '0')).join(':');
+    const row = document.createElement('div');
+    row.className = 'fe';
+    row.innerHTML = `<i style="background:${m.c};box-shadow:0 0 6px ${m.c}"></i><span>${m.icon} ${label}</span><time>${ts}</time>`;
+    feedEl.prepend(row);
+    while (feedEl.children.length > 7) feedEl.lastChild.remove();
+    [...feedEl.children].forEach((el, i) => el.classList.toggle('dim', i > 3));
+    render();
+  }
+  function showLabel(label) {
+    if (!feedEl) return;
+    const d = new Date();
+    const ts = [d.getHours(), d.getMinutes(), d.getSeconds()].map(x => String(x).padStart(2, '0')).join(':');
+    const row = document.createElement('div');
+    row.className = 'fe';
+    row.innerHTML = `<i style="background:#7bdff2;box-shadow:0 0 6px #7bdff2"></i><span>${label}</span><time>${ts}</time>`;
+    feedEl.prepend(row);
+    while (feedEl.children.length > 7) feedEl.lastChild.remove();
+    [...feedEl.children].forEach((el, i) => el.classList.toggle('dim', i > 3));
+  }
+  // 真实数据回填：memories 用实测条数，mood 用最近记忆的 salience 均值换算。
+  function seed(data) {
+    memories = data.count;
+    // 固化次数 ≠ 记忆条数：这里只把「本次会话里真实回放了几条」记到 cons，
+    // 不能用 memories 顶替，否则面板会出现「1 条记忆 / 固化 2 次」这种自相矛盾。
+    cons = 0;
+    mood = Math.max(-1, Math.min(1, (data.mood ?? 0.5) * 2 - 1));
+    render();
+  }
+  render();
+  return { emit, seed, showLabel, bumpCons: () => { cons++; render(); } };
+})();
+
+/* ================= 基础 ================= */
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+stage.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x030711);
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.05, 60);
+// 脑体沿 z 轴拉长（x*0.80 y*0.84 z*1.30），正面看是圆团；偏到侧 60° 才出现长椭圆脑轮廓
+camera.position.set(2.85, 0.62, 1.60);
+// 右侧有 340px 的 BILLING + EXEC LOG 面板，脑体必须往左让，
+// 否则标签会被面板压住（1440 宽下尤其明显）。视口水平偏移 = 面板宽的一半。
+const NUDGE = { x: 0, y: 0 };
+const SCENE = { r: 300 };      // 脑体在屏幕上的投影半径（px），标签环和流星量级都按它算
+function applyNudge() {
+  // 右侧 .meters / .ops 只在 ≤780 隐藏。只要它在，画面就要给面板让出 326px，
+  // 脑体居中在「剩余可用宽度」里 —— 这才是既不压面板、左边也不被切的做法。
+  // 原实现只在 >1100 才让位，781~1100 区间 shift=0 但面板照样显示，
+  // 就是「图层偏东、被执行日志挡住」的现场。
+  const panelVisible = innerWidth > 780;
+  const panelW = panelVisible ? 326 : 0;
+  const freeW = innerWidth - panelW;
+  const shift = panelW / 2;
+  NUDGE.x = shift;
+
+  // 让脑体直径约占可用宽度的 72%：靠调镜头距离实现，不是硬缩画面。
+  const tanHalf = Math.tan((camera.fov / 2) * Math.PI / 180);
+  const wantPx = Math.max(260, freeW * 0.72);
+  const dist = Math.min(5.6, Math.max(2.6, innerHeight / (wantPx * tanHalf)));
+  const dir = camera.position.clone().sub(controls.target);
+  if (dir.lengthSq() > 1e-6) {
+    camera.position.copy(controls.target).addScaledVector(dir.normalize(), dist);
+  }
+  SCENE.r = innerHeight / (2 * dist * tanHalf);
+
+  if (!shift) camera.clearViewOffset();
+  else camera.setViewOffset(innerWidth, innerHeight, shift, 0, innerWidth, innerHeight);
+}
+camera.lookAt(0, -0.02, -0.08);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, -0.04, -0.05);
+// 缓慢自转：一圈约 2.5 分钟，看得出在「活」，但不会把 7 个通路标签甩花。
+// 拖拽时停下（用户想看侧面时别跟他抢），松手 6 秒后再自己转起来。
+controls.enableDamping = true;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.42;
+let rotResumeT = 0;
+controls.addEventListener('start', () => { controls.autoRotate = false; rotResumeT = 0; });
+controls.addEventListener('end', () => { rotResumeT = performance.now() + 6000; });
+controls.minDistance = 0.8; controls.maxDistance = 6;
+controls.update();
+// 必须等 controls 建好再算：applyNudge 要按 controls.target 拉镜头距离。
+applyNudge();
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.8, 0.6, 0.12);
+composer.addPass(bloom);
+
+scene.add(new THREE.AmbientLight(0x1a2c44, 0.9));
+const keyLight = new THREE.PointLight(0x9cc8ff, 38, 25); keyLight.position.set(3.2, 2.4, 3.2); scene.add(keyLight);
+const rimLight = new THREE.PointLight(0x2a5a8a, 16, 22); rimLight.position.set(-3.2, -1.2, -2.6); scene.add(rimLight);
+
+/* ---------- 贴图 ---------- */
+function dotTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+function flareTexture(color) {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.2, color); gr.addColorStop(0.5, color + '55'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+}
+const dotTex = dotTexture();
+
+/* ================= 皮层结构点云（深蓝体系） ================= */
+const posC = [], colC = [], posD = [], colD = [];
+const tmp = new THREE.Color();
+const hsl = (h, s, l) => tmp.clone().setHSL(h, s, l).clone();
+const N = 26000;
+for (let i = 0; i < N; i++) {
+  const y = 1 - (i / (N - 1)) * 2;
+  const rr = Math.sqrt(Math.max(0, 1 - y * y));
+  const th = i * 2.399963229728653;
+  const dir = new THREE.Vector3(Math.cos(th) * rr, y, Math.sin(th) * rr);
+  const n = Math.sin(dir.x * 14) * Math.sin(dir.y * 11) + Math.sin(dir.z * 13 + 1.7) + Math.sin((dir.x + dir.z) * 8.3);
+  if (n < -1.05) continue;
+  if (Math.abs(dir.x) < 0.05) continue;
+  const rad = 0.74 + 0.26 * Math.pow(Math.random(), 0.45);
+  const p = dir.clone().multiplyScalar(rad);
+  p.x *= 0.80; p.y *= 0.84; p.z *= 1.30;
+  if (p.y < -0.40 && p.z > -0.25) continue;
+  const c = hsl(0.585 + Math.random() * 0.025, 0.55, 0.3 + Math.random() * 0.22);   // 深蓝
+  let cr = c.r, cg = c.g, cb = c.b;
+  if (p.z > 0.62) { tmp.copy(c).offsetHSL(0.01, 0, 0.12); cr = tmp.r; cg = tmp.g; cb = tmp.b; }
+  posC.push(p.x, p.y, p.z); colC.push(cr, cg, cb);
+}
+for (let i = 0; i < 900; i++) {          // 海马体（亮青 · 主角）
+  const side = i % 2 ? 1 : -1;
+  const p = new THREE.Vector3(side * (0.17 + Math.random() * 0.06), -0.14 + (Math.random() - 0.5) * 0.1, 0.1 + (Math.random() - 0.5) * 0.16);
+  const c = hsl(0.55, 0.85, 0.62);
+  posD.push(p.x, p.y, p.z); colD.push(c.r, c.g, c.b);
+}
+for (let i = 0; i < 240; i++) {          // 杏仁核（蓝紫 · 情绪）
+  const side = i % 2 ? 1 : -1;
+  const p = new THREE.Vector3(side * (0.15 + Math.random() * 0.04), -0.22 + (Math.random() - 0.5) * 0.06, 0.24 + (Math.random() - 0.5) * 0.06);
+  const c = hsl(0.66, 0.7, 0.58);
+  posD.push(p.x, p.y, p.z); colD.push(c.r, c.g, c.b);
+}
+for (let i = 0; i < 2800; i++) {         // 小脑
+  const a = Math.random() * Math.PI * 2, r = Math.pow(Math.random(), 0.5);
+  const p = new THREE.Vector3(Math.cos(a) * r * 0.42, (Math.random() - 0.5) * 0.24, -0.82 + Math.sin(a) * r * 0.34);
+  const c = hsl(0.57, 0.4, 0.26 + Math.random() * 0.14);
+  posC.push(p.x, p.y, p.z); colC.push(c.r, c.g, c.b);
+}
+for (let i = 0; i < 700; i++) {          // 脑干
+  const t = Math.random();
+  const p = new THREE.Vector3((Math.random() - 0.5) * 0.16 * (1 - t * 0.4), -0.5 - t * 0.55, -0.4 + t * 0.18);
+  const c = hsl(0.57, 0.35, 0.24);
+  posC.push(p.x, p.y, p.z); colC.push(c.r, c.g, c.b);
+}
+function makePoints(pos, col, size) {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  return new THREE.Points(geo, new THREE.PointsMaterial({
+    size, map: dotTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true
+  }));
+}
+const cortex = makePoints(posC, colC, 0.015);
+const deep = makePoints(posD, colD, 0.02);
+scene.add(cortex, deep);
+
+/* ================= 神经纤维束（同体系蓝，亮度随方向变化） ================= */
+const dtiLines = (() => {
+  const LP = [], LC = [];
+  const dirField = (x, y, z) => new THREE.Vector3(
+    Math.sin(y * 9.3 + 1.2) * Math.cos(z * 7.1),
+    Math.sin(z * 8.7 + 0.4) * Math.cos(x * 9.7),
+    Math.sin(x * 7.9 + 2.1) * Math.cos(y * 8.3)
+  ).normalize();
+  const cTmp = new THREE.Color();
+  for (let f = 0; f < 420; f++) {
+    let sx, sy, sz, rr;
+    do {
+      sx = (Math.random() * 2 - 1) * 0.62; sy = (Math.random() * 2 - 1) * 0.5; sz = (Math.random() * 2 - 1) * 0.9;
+      rr = Math.hypot(sx / 0.62, sy / 0.5, sz / 0.9);
+    } while (rr > 1);
+    let p = new THREE.Vector3(sx, sy, sz);
+    const pts = [p.clone()];
+    const steps = 12 + (Math.random() * 14 | 0);
+    for (let k = 0; k < steps; k++) {
+      const d = dirField(p.x, p.y, p.z).multiplyScalar(Math.random() < 0.5 ? 1 : -1);
+      p = p.clone().addScaledVector(d, 0.042);
+      const e = Math.hypot(p.x / 0.62, p.y / 0.5, p.z / 0.9);
+      if (e > 1) break;
+      pts.push(p.clone());
+    }
+    if (pts.length < 6) continue;
+    const dir = pts[pts.length - 1].clone().sub(pts[0]).normalize();
+    const b = 0.2 + (Math.abs(dir.x) + Math.abs(dir.y) * 0.7 + Math.abs(dir.z) * 0.5) * 0.3;
+    cTmp.setRGB(b * 0.35, b * 0.62, b * 1.0);
+    for (let k = 1; k < pts.length; k++) {
+      LP.push(pts[k - 1].x, pts[k - 1].y, pts[k - 1].z, pts[k].x, pts[k].y, pts[k].z);
+      LC.push(cTmp.r * 0.5, cTmp.g * 0.5, cTmp.b * 0.5, cTmp.r * 0.5, cTmp.g * 0.5, cTmp.b * 0.5);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(LP, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(LC, 3));
+  return new THREE.LineSegments(geo, new THREE.LineBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false
+  }));
+})();
+scene.add(dtiLines);
+
+/* ================= 记忆通路（真实解剖走线 · 青色）+ 关键名词标注 ================= */
+const NODES = [
+  { p: new THREE.Vector3(0.17, -0.14, 0.10), zh: '海马体',   en: 'HIPPOCAMPUS', role: '长时记忆体' },
+  { p: new THREE.Vector3(0.13, 0.02, 0.02),  zh: '穹窿',     en: 'FORNIX',      role: '输出纤维束' },
+  { p: new THREE.Vector3(0.02, -0.20, 0.10), zh: '乳头体',   en: 'MAMMILLARY',  role: '中继站' },
+  { p: new THREE.Vector3(0.11, 0.05, 0.00),  zh: '丘脑',     en: 'THALAMUS',    role: '前核转发' },
+  { p: new THREE.Vector3(0.00, 0.34, 0.02),  zh: '扣带回',   en: 'CINGULATE',   role: '情绪着色' },
+  { p: new THREE.Vector3(0.10, 0.20, 0.78),  zh: '前额叶',   en: 'PREFRONTAL',  role: '工作记忆' },
+  { p: new THREE.Vector3(0.18, -0.06, 0.30), zh: '内嗅皮层', en: 'ENTORHINAL',  role: '环路口' }
+];
+const EXTRA_LABELS = [
+  { p: new THREE.Vector3(0.16, -0.26, 0.24), zh: '杏仁核 · 情绪' },
+  { p: new THREE.Vector3(0, -0.44, -0.72),   zh: '小脑 · 习惯' },
+  { p: new THREE.Vector3(0.02, -0.72, -0.34), zh: '脑干 · 基础节律' }
+];
+const loopCurve = new THREE.CatmullRomCurve3(NODES.map(n => n.p), true, 'centripetal');
+const loopGroup = new THREE.Group(); scene.add(loopGroup);
+// 通路本体 = 浅浅的粒子流（不画粗管，能看清从哪里经过即可）
+const STREAM_N = 150;
+const streamPos = new Float32Array(STREAM_N * 3), streamCol = new Float32Array(STREAM_N * 3);
+const stream = Array.from({ length: STREAM_N }, () => ({
+  t: Math.random(),
+  sp: 0.009 + Math.random() * 0.013,
+  j: new THREE.Vector3((Math.random() - 0.5) * 0.05, (Math.random() - 0.5) * 0.05, (Math.random() - 0.5) * 0.05)
+}));
+const streamGeo = new THREE.BufferGeometry();
+streamGeo.setAttribute('position', new THREE.BufferAttribute(streamPos, 3));
+streamGeo.setAttribute('color', new THREE.BufferAttribute(streamCol, 3));
+scene.add(new THREE.Points(streamGeo, new THREE.PointsMaterial({
+  size: 0.03, map: dotTex, vertexColors: true, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending
+})));
+const NODE_TEX = flareTexture('#4ecbff');
+// 7 个通路节点全挤在脑中心，标签会互相盖住。
+// 用 DOM 叠层 + 每帧投影定位：标签排在脑体周围（极坐标排布），引线连回真实解剖点。
+const labelsEl = document.getElementById('labels');
+const leadersG = document.querySelector('#leaders g');
+const LABELS = NODES.map((n, i) => {
+  const el = document.createElement('div');
+  el.className = 'nl';
+  el.innerHTML = `<b>${n.zh}</b><em>${n.en}</em><s>${n.role}</s>`;
+  labelsEl.appendChild(el);
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  leadersG.appendChild(line);
+  // 屏幕极坐标：角度（度，0=右 90=下）+ 半径（相对短边）。
+  // 沿脑体轮廓铺开：左上两个、上方一个、右上一个、右侧两个、右下没有（会飘到按钮区）。
+  // 顶部还要避开 HUD 标题（高约 70px），所以最上面的标签角度别超过 -95°。
+  const ang = [-152, -128, -168, -12, -76, 34, 2][i];
+  // rad 是「脑体投影半径的倍数」，不是屏幕比例：镜头拉远时脑体变小，标签也得跟着收，
+  // 否则会掉进脑子里面。1.0 就是贴脑壳。
+  const rad = [1.26, 1.08, 1.28, 1.12, 1.10, 1.24, 1.16][i];
+  // 记下自身半宽：夹边界时按「整个标签不出界」算，而不是按中心点算。
+  // 只夹中心会让「丘脑 THALAMUS」这种宽标签半个身子钻进右侧日志卡里。
+  el.dataset.i = String(i);
+  return { el, line, ang, rad, node: n, hw: 0 };
+});
+function layoutLabels() {
+  // 窄屏底部有 100px 的 BILLING 条 + 72px 按钮，画面中心要上移，
+  // 否则标签会压到条上（720 档实测）。
+  const narrow = innerWidth <= 780;
+  // 标签环的圆心 / 半径都跟脑体走：圆心落在「可用宽度」的中点，
+  // 半径按脑体实际投影半径放大 —— 否则镜头一拉远，标签就飘在脑体外太空。
+  const cx = innerWidth / 2 - (narrow ? 0 : NUDGE.x);
+  const cy = innerHeight / 2 - (narrow ? 40 : 0);
+  const r0 = SCENE.r;
+  // 右侧有 308px 面板 + 18px 边距；标签要整块落在面板左侧，所以按自身半宽再收一次。
+  const rightLimit = innerWidth - 336;
+  const leftLimit = 12;
+  const v = new THREE.Vector3();
+  // 每个标签绕自己的节点偏一个固定角度：海马体/内嗅皮层这些原始位置挨得近，
+  // 纯径向偏移会叠成一坨，错开一点既分开又还是贴着那个部位。
+  const JITTER = [-24, 14, -40, 20, 0, -12, 44];
+  const place = [];
+  for (const L of LABELS) {
+    const idx = Number(L.el.dataset.i) || 0;
+    // 锚点 = 节点真实投影位置（引线起点）
+    v.copy(L.node.p).project(camera);
+    const ax = (v.x * 0.5 + 0.5) * innerWidth;
+    const ay = (-v.y * 0.5 + 0.5) * innerHeight;
+    // 标签贴着解剖点走：从脑心指向节点的方向往外让一小截。
+    // 这样脑体一转，海马体/丘脑的标签就跟着那个部位一起动，
+    // 不再挂在固定的一圈极坐标上（那看起来像"贴在旁边"，跟模型脱节）。
+    let dx = ax - cx, dy = ay - cy;
+    const dist = Math.hypot(dx, dy);
+    let ang = Math.atan2(dy, dx);
+    if (dist < 1) ang = L.ang * Math.PI / 180;
+    ang += (JITTER[idx] ?? 0) * Math.PI / 180;
+    dx = Math.cos(ang); dy = Math.sin(ang);
+    const off = Math.max(24, Math.min(62, r0 * 0.22));
+    if (!L.hw) L.hw = (L.el.offsetWidth || 90) / 2;      // 首次渲染后量一次，resize 时重测
+    place.push({ L, ax, ay, lx: ax + dx * off, ly: ay + dy * off, vis: v.z < 1 });
+  }
+  // 两轮简单的互斥：同一块脑区里的几个标签（海马体/乳头体/内嗅皮层）贴得太近时推开，
+  // 只要不跑出可用区域就行。
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i < place.length; i++) {
+      for (let j = i + 1; j < place.length; j++) {
+        const A = place[i], B = place[j];
+        const minX = A.L.hw + B.L.hw + 8;
+        const dx2 = B.lx - A.lx, dy2 = B.ly - A.ly;
+        if (Math.abs(dx2) < minX && Math.abs(dy2) < 26) {
+          const push = (minX - Math.abs(dx2)) / 2;
+          const sgn = dx2 >= 0 ? 1 : -1;
+          A.lx -= push * sgn; B.lx += push * sgn;
+        }
+      }
+    }
+  }
+  for (const P of place) {
+    const hw = P.L.hw;
+    // 夹住，别跑进右侧面板或飘出屏幕
+    const lx = Math.max(leftLimit + hw, Math.min(rightLimit - hw, P.lx));
+    const ly = Math.max(96, Math.min(innerHeight - 110, P.ly));
+    P.L.el.style.transform = `translate(-50%,-50%) translate(${lx.toFixed(1)}px,${ly.toFixed(1)}px)`;
+    P.L.el.style.opacity = P.vis ? '1' : '0';
+    P.L.line.setAttribute('x1', P.ax.toFixed(1)); P.L.line.setAttribute('y1', P.ay.toFixed(1));
+    P.L.line.setAttribute('x2', lx.toFixed(1)); P.L.line.setAttribute('y2', ly.toFixed(1));
+    P.L.line.setAttribute('opacity', P.vis ? '0.5' : '0');
+  }
+}
+const nodeSprites = [], nodeLabels = [];
+// 只保留节点光点的 Sprite；文字标签走上面的 DOM 叠层（#labels）。
+for (let ni = 0; ni < NODES.length; ni++) {
+  const n = NODES[ni];
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: NODE_TEX, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.8 }));
+  sp.position.copy(n.p); sp.scale.setScalar(0.1);
+  loopGroup.add(sp);
+  nodeSprites.push(sp);
+  nodeLabels.push(LABELS[ni].el);      // 高亮改 DOM class，不再缩放 Sprite
+}
+
+// 辅助标注（杏仁核 / 小脑 / 脑干）不是通路主线，用 canvas Sprite 就够了，
+// 不参与 DOM 叠层的高亮与防重叠。位置离脑心较远，不会被主干标签挤到。
+function makeLabel(n, colorA, colorB) {
+  const c = document.createElement('canvas'); c.width = 320; c.height = 64;
+  const g = c.getContext('2d');
+  g.textAlign = 'center';
+  g.font = '600 24px "Microsoft YaHei", sans-serif';
+  g.fillStyle = colorA; g.shadowColor = colorB; g.shadowBlur = 10;
+  g.fillText(n.zh, 160, 40);
+  const label = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, opacity: 0.7
+  }));
+  label.scale.set(0.5, 0.1, 1);
+  return label;
+}
+for (const e of EXTRA_LABELS) {
+  const label = makeLabel(e, 'rgba(150,185,215,0.95)', '#2a6a9a');
+  label.position.copy(e.p).add(new THREE.Vector3(0, 0.14, 0));
+  scene.add(label);
+}
+// 各节点在弧长参数上的 t（供脉冲定点发射）
+const nodeT = NODES.map((n) => {
+  let best = 0, bd = 1e9;
+  const v = new THREE.Vector3();
+  for (let s = 0; s <= 800; s++) {
+    const t = s / 800;
+    loopCurve.getPointAt(t, v);
+    const d = v.distanceToSquared(n.p);
+    if (d < bd) { bd = d; best = t; }
+  }
+  return best;
+});
+
+/* ---------- 火花池 ---------- */
+const SPARK_N = 220;
+const sparkPos = new Float32Array(SPARK_N * 3);
+const sparkCol = new Float32Array(SPARK_N * 3);
+const sparks = [];
+const sparkGeo = new THREE.BufferGeometry();
+sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+sparkGeo.setAttribute('color', new THREE.BufferAttribute(sparkCol, 3));
+scene.add(new THREE.Points(sparkGeo, new THREE.PointsMaterial({
+  size: 0.05, map: dotTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+})));
+const brainPoints = [];
+{
+  const a = cortex.geometry.getAttribute('position');
+  for (let i = 0; i < a.count; i += 7) brainPoints.push(new THREE.Vector3(a.getX(i), a.getY(i), a.getZ(i)));
+}
+function spawnSparks(origin, color, n = 46, speed = 0.85) {
+  for (let i = 0; i < n; i++) {
+    if (sparks.length >= SPARK_N) sparks.shift();
+    const v = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize().multiplyScalar(speed * (0.4 + Math.random()));
+    sparks.push({ p: origin.clone(), v, life: 0.9 + Math.random() * 0.5, max: 1.4, c: color });
+  }
+}
+
+/* ---------- 流星：划过脑体的粒子尾迹 ---------- */
+// 一颗流星 = 沿速度方向「固定等距」采样的一串点（不是按帧记录历史位置）。
+// 早期版本按帧采样，帧率一变尾巴就散成碎点、看不出是划过去的；等距采样跟帧率无关，永远是连续的一道光。
+const METEOR_MAX = 18, METEOR_TRAIL = 30;
+const METEOR_LEN = 0.95;                  // 尾巴长度（世界单位）
+const meteorPos = new Float32Array(METEOR_MAX * METEOR_TRAIL * 3);
+const meteorCol = new Float32Array(METEOR_MAX * METEOR_TRAIL * 3);
+const meteorGeo = new THREE.BufferGeometry();
+meteorGeo.setAttribute('position', new THREE.BufferAttribute(meteorPos, 3));
+meteorGeo.setAttribute('color', new THREE.BufferAttribute(meteorCol, 3));
+const meteorPts = new THREE.Points(meteorGeo, new THREE.PointsMaterial({
+  size: 0.075, map: dotTex, vertexColors: true, transparent: true,
+  depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true
+}));
+meteorPts.frustumCulled = false;          // 包围球只在首帧算过，别让它把流星裁掉
+scene.add(meteorPts);
+const meteors = [];
+const mCol = new THREE.Color();
+function spawnMeteor(bright = false) {
+  if (meteors.length >= METEOR_MAX) return;
+  // 从脑体一侧外缘射向斜对面，保证真的「穿过」脑子而不是擦边
+  const a = Math.random() * Math.PI * 2;
+  const r = 1.20 + Math.random() * 0.55;
+  const y0 = (Math.random() - 0.5) * 1.05;
+  const from = new THREE.Vector3(Math.cos(a) * r, y0, Math.sin(a) * r * 0.85);
+  const to = new THREE.Vector3(
+    -from.x * (0.55 + Math.random() * 0.5),
+    y0 * -0.5 + (Math.random() - 0.5) * 0.45,
+    -from.z * (0.5 + Math.random() * 0.5)
+  );
+  meteors.push({
+    p: from.clone(),
+    dir: to.clone().sub(from).normalize(),
+    sp: (bright ? 1.55 : 0.95) + Math.random() * 0.6,
+    hue: bright ? 0.545 : 0.585,
+    light: bright ? 0.80 : 0.60,
+    len: METEOR_LEN * (bright ? 1.25 : 0.85 + Math.random() * 0.4)
+  });
+}
+function updateMeteors(dt) {
+  for (let i = meteors.length - 1; i >= 0; i--) {
+    const m = meteors[i];
+    m.p.addScaledVector(m.dir, m.sp * dt);
+    if (m.p.length() > 2.6) meteors.splice(i, 1);
+  }
+  let k = 0;
+  for (let i = 0; i < METEOR_MAX; i++) {
+    const m = meteors[i];
+    for (let j = 0; j < METEOR_TRAIL; j++, k++) {
+      if (m) {
+        const f0 = j / (METEOR_TRAIL - 1);                  // 0=头 1=尾
+        // 尾巴微微抖一下，粒子感更强，但整体仍是一条线
+        const jitter = 0.012 * f0;
+        meteorPos[k * 3] = m.p.x - m.dir.x * m.len * f0 + (Math.random() - 0.5) * jitter;
+        meteorPos[k * 3 + 1] = m.p.y - m.dir.y * m.len * f0 + (Math.random() - 0.5) * jitter;
+        meteorPos[k * 3 + 2] = m.p.z - m.dir.z * m.len * f0 + (Math.random() - 0.5) * jitter;
+        const f = Math.pow(1 - f0, 1.35);                   // 头亮尾暗
+        // 头部纯白、尾巴走青色（比脑体的深蓝更亮一档），不然在纤维堆里根本认不出来
+        mCol.setHSL(f0 < 0.12 ? 0.0 : 0.53, f0 < 0.12 ? 0.0 : 0.62, f0 < 0.12 ? 1.0 : 0.72);
+        meteorCol[k * 3] = mCol.r * f; meteorCol[k * 3 + 1] = mCol.g * f; meteorCol[k * 3 + 2] = mCol.b * f;
+      } else {
+        meteorPos[k * 3] = 9999; meteorPos[k * 3 + 1] = 9999; meteorPos[k * 3 + 2] = 9999;
+        meteorCol[k * 3] = meteorCol[k * 3 + 1] = meteorCol[k * 3 + 2] = 0;
+      }
+    }
+  }
+  meteorGeo.attributes.position.needsUpdate = true;
+  meteorGeo.attributes.color.needsUpdate = true;
+}
+let meteorTimer = 0.8;
+
+// 自检探针：带 ?probe=1 打开时把实时状态写进 <title>，
+// 无头浏览器 `--dump-dom` 就能读到「流星在不在跑、镜头有没有自转」。
+// 平时不写，不影响正常使用。
+if (location.search.includes('probe')) {
+  window.__wmProbe = { meteors, sparks, SCENE, meteorGeo, meteorPts, camera, controls };
+  setInterval(() => {
+    const az = (controls.getAzimuthalAngle() * 180 / Math.PI).toFixed(1);
+    document.title = `M${meteors.length} S${sparks.length} R${Math.round(SCENE.r)} AZ${az}`;
+  }, 400);
+}
+
+/* ---------- 通路脉冲 ---------- */
+const PULSE_N = 40;
+const pulsePos = new Float32Array(PULSE_N * 3), pulseCol = new Float32Array(PULSE_N * 3);
+const pulses = [];
+const pulseGeo = new THREE.BufferGeometry();
+pulseGeo.setAttribute('position', new THREE.BufferAttribute(pulsePos, 3));
+pulseGeo.setAttribute('color', new THREE.BufferAttribute(pulseCol, 3));
+scene.add(new THREE.Points(pulseGeo, new THREE.PointsMaterial({
+  size: 0.08, map: dotTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+})));
+const bez = new THREE.Vector3();
+function fireLoopPulse(t0, color, speed = 0.22) {
+  if (pulses.length >= PULSE_N) pulses.shift();
+  pulses.push({ t: ((t0 % 1) + 1) % 1, sp: speed * (0.8 + Math.random() * 0.4), c: color });
+}
+
+/* ================= 执行轨迹标注（命令走到哪，亮到哪） ================= */
+let activeIdx = -1, activeUntil = 0;
+function activateNode(i, cmdText, dur = 0.8) {
+  activeIdx = i; activeUntil = performance.now() / 1000 + dur;
+  traceEl.innerHTML = `<span class="dot"></span>${cmdText} ｜ <b>${NODES[i].zh} ${NODES[i].en}</b> · ${NODES[i].role}`;
+  spawnSparks(NODES[i].p, 0x9fdcff, 14, 0.5);
+  fireLoopPulse(nodeT[i], 0xbfe8ff, 0.3);
+  spawnMeteor(true);                     // 每一步都划一颗亮流星，让「正在跑」看得见
+}
+function traceIdle(text) {
+  traceEl.innerHTML = `<span class="dot"></span>${text}`;
+}
+
+/* ---------- 记忆数据：从真实数据源加载（whale-mind diary + 大飞鱼记忆宫殿镜像） ---------- */
+let POOL = [];                        // 真实记忆文本，按 salience / 时间排序
+let REAL_COUNT = 0;
+let usedIdx = 0;
+const AMG = new THREE.Vector3(0.15, -0.22, 0.24);
+
+const BASE = '/whale-mind/panel/brain';
+let EVENTS = [];
+
+// 记忆事件流：谁在什么时候记了什么。大飞鱼（QQ 侧）的条目带 🐟 角标。
+function renderEvents() {
+  const box = document.getElementById('evlist');
+  if (!box) return;
+  if (!EVENTS.length) {
+    box.innerHTML = '<div class="ev empty">还没有任何记忆事件</div>';
+    return;
+  }
+  box.innerHTML = EVENTS.slice(0, 3).map((e) => {
+    const d = new Date(e.at || Date.now());
+    const ts = [d.getMonth() + 1, d.getDate()].join('/') + ' ' +
+      [d.getHours(), d.getMinutes()].map((x) => String(x).padStart(2, '0')).join(':');
+    const tag = e.source === 'dafeiyu'
+      ? '<i class="src dy">🐟 大飞鱼</i>'
+      : '<i class="src lo">🖋 手记</i>';
+    return `<div class="ev">${tag}<span>${escapeHtml(e.text || '')}</span><time>${ts}</time></div>`;
+  }).join('');
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+async function jget(path) {
+  const r = await fetch(BASE + path, { headers: { accept: 'application/json' } });
+  if (!r.ok) throw new Error(path + ' → ' + r.status);
+  return r.json();
+}
+
+async function loadReal() {
+  try {
+    const [g, b, ev] = await Promise.all([jget('/api/graph'), jget('/api/bridge'), jget('/api/events')]);
+    EVENTS = ((ev && ev.events) || []).filter((x) => /^wm_qq_/.test(String(x.ref || '')));
+    renderEvents();
+    const nodes = (g.nodes || []).filter((n) => n.kind === 'memory' && n.level !== 'rules' && n.source === 'qq');
+    REAL_COUNT = nodes.length;
+    // 记忆节点里，文本在 content（title/label 是截断过的），权重在 strength。
+    // source: 'dafeiyu' = 大飞鱼记忆宫殿的只读镜像；其他值是本地 diary 的 session 名。
+    POOL = nodes
+      .sort((a, x) => (x.strength || 0) - (a.strength || 0))
+      .map((n) => String(n.content || n.label || '').replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+      .map((t) => (t.length > 40 ? t.slice(0, 40) + '…' : t));
+    const avg = nodes.length
+      ? nodes.reduce((s2, n) => s2 + (typeof n.strength === 'number' ? n.strength : 0.5), 0) / nodes.length
+      : 0.5;
+    OPS.seed({ count: REAL_COUNT, mood: avg });
+    // 状态位：区分「本地手记」「大飞鱼镜像」「大飞鱼是否在线」
+    const parts = [];
+    const local = nodes.filter((n) => n.source !== 'dafeiyu').length;
+    const dye = nodes.filter((n) => n.source === 'dafeiyu').length;
+    parts.push(`本地手记 <b>${local}</b>`);
+    if (dye) parts.push(`大飞鱼 <b class="gold">${dye}</b>`);
+    if (b && !b.memoryEnabled) parts.push(`<span style="color:#c08a3a">大飞鱼未启用</span>`);
+    // 宫殿是空的这件事必须说出来，不然用户以为联动坏了
+    if (b && b.memoryEnabled && !b.total) parts.push(`<span style="color:#c08a3a">宫殿还空着</span>`);
+    if (!parts.length) parts.push('还没有任何记忆');
+    OPS.showLabel('🔗 已接入真实记忆 · ' + parts.join(' · '));
+    traceIdle(`待机 · 已载入 ${REAL_COUNT} 条真实记忆（本地 ${local}${dye ? ` + 大飞鱼 ${dye}` : ''}）`);
+    return g;
+  } catch (e) {
+    traceIdle('⚠ 真实数据加载失败：' + e.message + '（仍在演示模式）');
+    return null;
+  }
+}
+const READY = loadReal();
+
+/* ---------- 事件 → 视觉（命令逐步走到每个节点） ---------- */
+const actions = {
+  write(label = null) {
+    // 没传 label 就从真实记忆里取一条回放（不是编的）
+    if (!label) {
+      label = POOL.length
+        ? '回放：' + POOL[usedIdx++ % POOL.length]
+        : '暂无记忆可回放 · 去和大飞鱼聊几句';
+    }
+    OPS.emit('write', label);
+    spawnSparks(NODES[0].p, 0x9fdcff, 50, 0.85);
+    // 只有真实回放才计入「固化」，不然计数是假的
+    if (POOL.length) OPS.bumpCons();
+    const seq = [
+      [0.0, 0, '✍ 写入 · 值得记 → 送存'],
+      [0.9, 1, '✍ 写入 · 输出纤维束'],
+      [1.3, 2, '✍ 写入 · 中继'],
+      [1.7, 3, '✍ 写入 · 路由前核'],
+      [2.1, 4, '✍ 写入 · 情绪加权'],
+      [2.6, 5, '✍ 写入 · 注入对话']
+    ];
+    for (const [dt2, i, txt] of seq) setTimeout(() => activateNode(i, txt, 0.8), dt2 * 1000);
+    setTimeout(() => traceIdle('✍ 写入完成 · ' + label), 3500);
+  },
+  recall(label = null) {
+    if (!label) {
+      label = POOL.length
+        ? POOL[usedIdx++ % POOL.length]
+        : '还空着 · 没有可检索的记忆';
+    }
+    OPS.emit('recall', label);
+    spawnSparks(NODES[0].p, 0xdff3ff, 36, 0.7);
+    const seq = [
+      [0.0, 0, '💡 回忆 · 检索命中（本地 0t）'],
+      [0.4, 1, '💡 回忆 · 输出纤维束'],
+      [0.8, 2, '💡 回忆 · 中继'],
+      [1.2, 3, '💡 回忆 · 路由前核'],
+      [1.6, 4, '💡 回忆 · 情绪着色'],
+      [2.0, 5, '💡 回忆 · 注入对话'],
+      [2.4, 6, '💡 回忆 · 环路回流']
+    ];
+    for (const [dt2, i, txt] of seq) setTimeout(() => activateNode(i, txt, 0.75), dt2 * 1000);
+    setTimeout(() => traceIdle('💡 回忆完成 · ' + label), 3200);
+  },
+  forget(label = '遗忘：最旧一条已降级') {
+    OPS.emit('forget', label);
+    spawnSparks(NODES[0].p, 0x51708c, 30, 0.4);
+    activateNode(0, '🍂 遗忘 · salience 降级（不删除）', 1.2);
+    setTimeout(() => activateNode(6, '🍂 遗忘 · 环路口回流', 0.9), 900);
+    setTimeout(() => traceIdle('🍂 遗忘完成 · 衰减 ×0.9/天 · 下限 0.16'), 2200);
+  },
+  decay(label = '夜整：salience ×0.9（下限 0.16）') {
+    OPS.emit('decay', label);
+    activateNode(5, '🌙 夜整 · 全环衰减', 1.0);
+    setTimeout(() => traceIdle('🌙 夜整完成 · ' + label), 1600);
+  },
+  gate(label = '门控：寒暄一句 · 跳过零成本') {
+    OPS.emit('gate', label);
+    spawnSparks(AMG, 0x8fb4ff, 16, 0.5);
+    traceIdle('⏱ 门控 · 杏仁核 AMYGDALA · 情绪判据 · 260t · 本轮跳过');
+  }
+};
+
+/* ---------- 交互 ---------- */
+let autoMode = true, autoHold = 0;
+document.getElementById('b-write').onclick = () => { actions.write(); autoHold = 14; };
+document.getElementById('b-recall').onclick = () => { actions.recall(); autoHold = 14; };
+document.getElementById('b-forget').onclick = () => { actions.forget(); autoHold = 14; };
+document.getElementById('b-gate').onclick = () => { actions.gate(); autoHold = 14; };
+document.getElementById('b-auto').onclick = () => {
+  autoMode = !autoMode;
+  document.getElementById('b-auto').classList.toggle('on', autoMode);
+  document.getElementById('b-auto').textContent = autoMode ? '⏸ 自动演示' : '▶ 继续演示';
+};
+document.getElementById('b-refresh').onclick = async () => {
+  const g = await loadReal();
+  if (g) OPS.showLabel('🔄 已刷新 · ' + REAL_COUNT + ' 条记忆');
+};
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  LABELS.forEach((L) => { L.hw = 0; });          // 字号随媒体查询变化，半宽要重测
+  applyNudge();
+  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
+});
+
+/* ---------- 自动情景循环 ---------- */
+// 只走「演示通路」的视觉，文案一律来自真实记忆池（POOL 为空时自然降级为提示语）。
+const SCEN = [
+  ['write', null], ['gate', null], ['recall', null],
+  ['write', null], ['decay', null], ['recall', null],
+  ['forget', null], ['gate', null], ['write', null]
+];
+let scenIdx = 0, scenT = 2.2;
+
+/* ---------- 主循环 ---------- */
+const clock = new THREE.Clock();
+let fireTimer = 0;
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(0.05, clock.getDelta());
+  controls.update();
+  // 拖拽结束后 6 秒恢复自转
+  if (!controls.autoRotate && rotResumeT && performance.now() > rotResumeT) {
+    controls.autoRotate = true; rotResumeT = 0;
+  }
+  scenT -= dt;
+  if (autoMode && scenT <= 0) {
+    if (autoHold > 0) { autoHold -= 1; scenT = 1; }
+    else {
+      const [type, label] = SCEN[scenIdx % SCEN.length]; scenIdx++;
+      actions[type](label || undefined);
+      scenT = 4.2 + Math.random() * 1.6;          // 留足轨迹演完的时间
+    }
+  }
+  // 活动节点高亮（放大光斑 + 标签变亮），到期回落
+  const now = performance.now() / 1000;
+  nodeSprites.forEach((sp, i) => {
+    const on = i === activeIdx && now < activeUntil;
+    const target = on ? 0.2 : 0.1;
+    sp.scale.setScalar(sp.scale.x + (target - sp.scale.x) * Math.min(1, dt * 8));
+    sp.material.opacity = on ? 1 : 0.8;
+    const lb = nodeLabels[i];
+    if (lb) lb.classList.toggle('on', on);
+  });
+  layoutLabels();
+  if (activeIdx >= 0 && now >= activeUntil) { activeIdx = -1; traceIdle('待机 · 等待记忆事件'); }
+  fireTimer -= dt;
+  if (fireTimer <= 0) {
+    fireTimer = 0.12 + Math.random() * 0.25;
+    const a = brainPoints[Math.floor(Math.random() * brainPoints.length)];
+    const b = a.clone().add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(0.34));
+    spawnSparks(a, 0x3a6a9a, 4, 0.26);
+    spawnSparks(b, 0x3a6a9a, 3, 0.2);
+  }
+  // 流星：平时稀稀拉拉地划，事件触发时会额外补一颗亮的
+  meteorTimer -= dt;
+  if (meteorTimer <= 0) {
+    meteorTimer = 0.7 + Math.random() * 1.8;
+    spawnMeteor(Math.random() < 0.22);
+  }
+  updateMeteors(dt);
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const s = sparks[i];
+    s.life -= dt; s.p.addScaledVector(s.v, dt); s.v.multiplyScalar(0.965);
+    if (s.life <= 0) sparks.splice(i, 1);
+  }
+  for (let i = 0; i < SPARK_N; i++) {
+    const s = sparks[i];
+    if (s) {
+      sparkPos.set([s.p.x, s.p.y, s.p.z], i * 3);
+      const a = Math.max(0, s.life / s.max);
+      tmp.setHex(s.c);
+      sparkCol.set([tmp.r * a, tmp.g * a, tmp.b * a], i * 3);
+    } else { sparkPos.set([9999, 9999, 9999], i * 3); sparkCol.set([0, 0, 0], i * 3); }
+  }
+  sparkGeo.attributes.position.needsUpdate = true;
+  sparkGeo.attributes.color.needsUpdate = true;
+  // 通路粒子流（浅浅地漂过，标出路径）
+  {
+    const sv = new THREE.Vector3();
+    for (let i = 0; i < STREAM_N; i++) {
+      const st = stream[i];
+      st.t = (st.t + st.sp * dt) % 1;
+      loopCurve.getPointAt(st.t, sv).add(st.j);
+      streamPos.set([sv.x, sv.y, sv.z], i * 3);
+      const tw = 0.45 + 0.55 * Math.sin(now * 1.8 + i * 1.37);
+      streamCol.set([0.16 * tw, 0.34 * tw, 0.55 * tw], i * 3);
+    }
+    streamGeo.attributes.position.needsUpdate = true;
+    streamGeo.attributes.color.needsUpdate = true;
+  }
+  // 通路脉冲传导
+  for (let i = pulses.length - 1; i >= 0; i--) {
+    const p = pulses[i];
+    p.t = (p.t + p.sp * dt) % 1;
+    loopCurve.getPointAt(p.t, bez);
+    pulsePos.set([bez.x, bez.y, bez.z], i * 3);
+    tmp.setHex(p.c);
+    pulseCol.set([tmp.r, tmp.g, tmp.b], i * 3);
+  }
+  for (let i = 0; i < PULSE_N; i++) {
+    if (i >= pulses.length) { pulsePos.set([9999, 9999, 9999], i * 3); pulseCol.set([0, 0, 0], i * 3); }
+  }
+  pulseGeo.attributes.position.needsUpdate = true;
+  pulseGeo.attributes.color.needsUpdate = true;
+  composer.render();
+});
+</script>
+
+<script>
+(function(){
+  // 面板只在打开时拉一次数据，所以挂个刷新按钮；页面切到后台时顺手整页重载，
+  // 回来就是最新的，但不会打断正在看的人。
+  try {
+    var btn = document.createElement('button');
+    btn.textContent = '⟳ 刷新记忆';
+    btn.title = '重新拉一次 diary';
+    btn.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:2147483647;padding:8px 16px;' +
+      'border-radius:999px;border:1px solid rgba(150,200,255,.4);background:rgba(10,18,32,.82);' +
+      'color:#cfe6ff;font:600 13px "Microsoft YaHei",sans-serif;cursor:pointer;backdrop-filter:blur(6px)';
+    btn.onclick = function(){ location.reload(); };
+    document.body.appendChild(btn);
+    setInterval(function(){ if (document.hidden) location.reload(); }, 120000);
+  } catch (e) { console.warn('[whale-mind] refresh button failed', e); }
+})();
+</script>
+</body>
+</html>

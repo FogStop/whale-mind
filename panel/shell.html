@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>whale-mind · 三板面板</title>
+<style>
+  :root{--bg:#0b0e14;--fg:#e7e9ee;--brand:#4ecbff;--border:#262d3a}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);overflow:hidden;
+    font-family:-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif}
+  .bar{height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;
+    background:#0d1220;border-bottom:1px solid var(--border)}
+  .bar .logo{font-weight:700;font-size:15px;letter-spacing:.06em;color:#dfe9ff;margin-right:6px}
+  .bar .logo i{font-style:normal;color:var(--brand)}
+  .bar button{background:#101b30;color:#dfe8f2;border:1px solid #22314a;border-radius:999px;
+    padding:7px 18px;cursor:pointer;font-size:13px}
+  .bar button:hover{border-color:var(--brand)}
+  .bar button.active{background:var(--brand);color:#0b0e14;border-color:var(--brand);font-weight:600}
+  .bar .live{margin-left:auto;font-size:11px;color:#5f8aa8;font-family:Consolas,monospace}
+  iframe{width:100%;height:calc(100% - 52px);border:0;display:block;background:#05070f}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="bar">
+  <span class="logo">🐋 whale<i>-mind</i></span>
+  <button class="active" data-t="brain">🧠 记忆星脑</button>
+  <button data-t="ring">🌀 记忆星环</button>
+  <button data-t="galaxy">🌌 记忆银河</button>
+  <button data-t="manager">🛠 管理</button>
+  <span class="live" id="live">同一条记忆 · 三种形态</span>
+</div>
+<iframe id="brain" src="/whale-mind/panel/brain" title="记忆星脑"></iframe>
+<iframe id="ring" src="/whale-mind/panel/ring#neural" title="记忆星环" class="hidden"></iframe>
+<iframe id="galaxy" src="/whale-mind/panel/galaxy" title="记忆银河" class="hidden"></iframe>
+<iframe id="manager" src="/whale-mind/panel/manager" title="管理" class="hidden"></iframe>
+<script>
+  // display:none 的 iframe 里 canvas 初始化拿到 0×0，WebGL 会持续报
+  // "Framebuffer is incomplete: Attachment has zero size"，且点开时画面尺寸仍是错的。
+  // 只在切到该板时才给 src 赋值（lazy load），这样 canvas 一出生就是正确尺寸。
+  const SRC = {};
+  document.querySelectorAll('iframe[id]').forEach((f) => {
+    SRC[f.id] = f.getAttribute('src');
+    if (f.classList.contains('hidden')) f.removeAttribute('src');
+  });
+  const mount = (frame, force) => {
+    // 每次切到这个页签都重新赋一次 src（带时间戳），保证看到的是刚从 diary 拉的最新数据，
+    // 而不是那个页签上次打开时留下的旧画面。
+    if (force) {
+      frame.setAttribute('src', SRC[frame.id] + (SRC[frame.id].includes('?') ? '&' : '?') + 't=' + Date.now());
+    } else if (!frame.getAttribute('src')) {
+      frame.setAttribute('src', SRC[frame.id]);
+    }
+    // 已挂载的板补一次 resize，让 renderer/composer 按当前视口重算
+    const kick = () => {
+      try { frame.contentWindow.dispatchEvent(new Event('resize')); } catch (e) { /* ignore */ }
+    };
+    kick();
+    setTimeout(kick, 80);
+  };
+  document.querySelectorAll('.bar button').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('.bar button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      ['brain', 'ring', 'galaxy', 'manager'].forEach(id => {
+        const frame = document.getElementById(id);
+        const show = id === b.dataset.t;
+        frame.classList.toggle('hidden', !show);
+        if (show) mount(frame, true);
+      });
+      document.getElementById('live').textContent = '已切换：' + b.textContent.trim() + ' · ' + new Date().toLocaleTimeString('zh-CN');
+    };
+  });
+</script>
+</body>
+</html>

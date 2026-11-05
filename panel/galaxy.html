@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#050209">
+<title>Memory · 记忆银河</title>
+<link href="https://cdn.jsdelivr.net/npm/@fontsource/cormorant-garamond@5/400-italic.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fontsource/playfair-display@5/600-italic.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/300.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/400.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/500.min.css" rel="stylesheet">
+
+<!-- ═══════════════════════════════════════════════════════════
+     ① CONFIG —— 只改这里就能变成你们自己的银河
+     ═══════════════════════════════════════════════════════════ -->
+<script>
+const CONFIG = {
+  title:    'whale-mind',                       // 大标题（英文衬线体）
+  subtitle: 'A sea of memories',  // 副标题
+  motto:    '她经历过的每一件事，都是一个点。', // 中文小字
+  coreName: '最新的事',                      // 中心那颗星的名字
+  coreEn:   'Where it all began',           // 中心星的英文小字（比如你们的纪念日、TA 的名字）
+  dataUrl:  '/whale-mind/panel/brain/api/graph',  // 直接吃星脑那条真实数据接口，前端自己转成银河结构
+};
+</script>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#050209}
+body{font-family:"Noto Serif SC","Songti SC",serif;color:#F3EAF5}
+#gl{position:fixed;inset:0;display:block;touch-action:none}
+
+/* 开场黑幕 */
+#veil{position:fixed;inset:0;z-index:30;background:#050209;pointer-events:none;
+  transition:opacity 2s ease}
+#veil.gone{opacity:0}
+
+.head{position:fixed;top:0;left:0;right:0;z-index:10;text-align:center;
+  padding:calc(env(safe-area-inset-top) + 16px) 16px 0;pointer-events:none;
+  opacity:0;transition:opacity 1.6s ease .6s}
+.head.in{opacity:1}
+.head h1{font-family:"Playfair Display",serif;font-style:italic;font-weight:600;
+  font-size:30px;color:#F6ECFA;text-shadow:0 0 30px rgba(210,150,230,.6)}
+.head .sub{font-family:"Cormorant Garamond",serif;font-style:italic;font-size:14px;
+  color:rgba(220,200,240,.55);letter-spacing:.16em;margin-top:2px}
+.head .zh{font-family:"Noto Serif SC",serif;font-weight:300;font-size:12.5px;
+  color:rgba(220,205,238,.45);letter-spacing:.16em;margin-top:14px}
+
+#labels{position:fixed;inset:0;z-index:6;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;
+  transition:opacity .4s ease;will-change:transform,opacity}
+.lbl .t{font-family:"Noto Serif SC",serif;font-weight:400;font-size:13px;color:#FBEFFA;
+  text-shadow:0 0 12px rgba(255,180,230,.7),0 1px 4px rgba(0,0,0,.8);letter-spacing:.04em}
+.lbl .d{font-family:"Cormorant Garamond",serif;font-style:italic;font-size:11px;
+  color:rgba(230,205,240,.7);letter-spacing:.08em;margin-top:1px;text-shadow:0 1px 4px rgba(0,0,0,.8)}
+.lbl.core{transform:translate(-50%,10px)}
+.lbl.core .t{font-size:18px;font-weight:500;letter-spacing:.14em;text-shadow:0 0 22px rgba(255,180,235,1)}
+.lbl.core .en{font-family:"Cormorant Garamond",serif;font-style:italic;font-size:12.5px;
+  color:rgba(238,212,246,.8);letter-spacing:.16em;margin-top:1px}
+
+.hint{position:fixed;left:50%;transform:translateX(-50%);z-index:7;
+  bottom:calc(env(safe-area-inset-bottom) + 18px);
+  font-family:"Cormorant Garamond",serif;font-style:italic;font-size:12px;
+  color:rgba(225,205,240,.35);letter-spacing:.14em;white-space:nowrap;
+  transition:opacity .8s ease;pointer-events:none}
+
+#scrim{position:fixed;inset:0;z-index:20;background:transparent;opacity:0;pointer-events:none;transition:opacity .4s ease}
+#scrim.show{opacity:1;pointer-events:auto}
+/* 低存在感：文字直接从底部渐隐浮现，无卡片框，星空是主角 */
+#card{position:fixed;left:0;right:0;bottom:0;z-index:21;
+  max-height:50vh;display:flex;flex-direction:column;
+  padding:40px 26px calc(22px + env(safe-area-inset-bottom));
+  background:linear-gradient(to top,rgba(5,2,12,.92) 34%,rgba(5,2,12,.5) 66%,rgba(5,2,12,0));
+  border:none;box-shadow:none;
+  opacity:0;transform:translateY(22px);pointer-events:none;
+  transition:opacity .55s ease,transform .55s ease}
+#card.show{opacity:1;transform:translateY(0);pointer-events:auto}
+.c-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.c-star{width:30px;height:30px;flex-shrink:0}
+.c-title{flex:1}
+.c-title .t{font-family:"Noto Serif SC",serif;font-size:17px;color:#FCF0FA;line-height:1.3;font-weight:500}
+.c-title .en{font-family:"Cormorant Garamond",serif;font-style:italic;font-size:12.5px;
+  color:rgba(230,205,242,.7);letter-spacing:.1em;margin-top:1px}
+.c-close{border:none;background:transparent;color:rgba(230,205,242,.55);font-size:20px;cursor:pointer;padding:2px 4px;align-self:flex-start}
+.c-meta{display:flex;align-items:center;gap:10px;margin:10px 0 12px}
+.c-date{font-family:"Cormorant Garamond",serif;font-style:italic;font-size:13px;color:rgba(232,208,244,.75)}
+.c-tag{font-family:"Noto Serif SC",serif;font-size:11px;color:#F5D9EE;background:rgba(210,140,200,.2);
+  padding:3px 11px;border-radius:99px;border:1px solid rgba(230,170,220,.25)}
+.c-body{font-family:"Noto Serif SC",serif;font-weight:300;overflow-y:auto;font-size:14px;line-height:2.05;
+  color:rgba(244,234,248,.9);white-space:pre-wrap;overscroll-behavior:contain;letter-spacing:.02em;flex:1}
+.c-body::-webkit-scrollbar{width:3px}
+.c-body::-webkit-scrollbar-thumb{background:rgba(230,180,230,.25);border-radius:3px}
+.c-fact{position:relative;padding:8px 0 8px 20px;border-bottom:1px solid rgba(230,180,230,.08)}
+.c-fact::before{content:"✦";position:absolute;left:0;top:10px;font-size:10px;color:#E89AD8;opacity:.8}
+.c-acts{display:flex;gap:14px;margin-top:18px;flex-shrink:0}
+.c-acts button{width:38px;height:38px;border:none;cursor:pointer;border-radius:50%;
+  background:transparent;
+  display:flex;align-items:center;justify-content:center;color:rgba(235,198,232,.5);transition:all .2s ease}
+.c-acts button:active{transform:scale(.9);color:#f0b8e4}
+.c-acts svg{width:20px;height:20px}
+
+.loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:"Cormorant Garamond",serif;font-style:italic;color:rgba(225,205,240,.5);
+  font-size:16px;letter-spacing:.12em;z-index:31}
+  /* ---- whale-mind 账单 + 执行日志（低存在感） ---- */
+  .meters{position:fixed;left:18px;bottom:18px;z-index:22;width:270px;font-size:11.5px;color:#b9aed0;
+    font-variant-numeric:tabular-nums;background:rgba(10,8,16,.6);border:1px solid rgba(200,160,240,.18);
+    border-radius:10px;padding:9px 13px;backdrop-filter:blur(6px)}
+  .meters .cap{font-size:10px;letter-spacing:.18em;color:#8a7aa8;margin-bottom:4px}
+  .meters>div{line-height:1.78;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .meters b{color:#f0e8fa;font-weight:600}
+  .meters .gold{color:#ffd9a0}.meters .blue{color:#b8ccff}.meters .pink{color:#e8b0d8}
+  .moodbar{display:inline-block;letter-spacing:1px;color:#2a2038}
+  .moodbar i{font-style:normal;color:#e8b0d8}
+  .ops{position:fixed;right:18px;top:16px;z-index:22;width:262px;font-family:Consolas,monospace;font-size:11.5px;
+    color:#c8bce0;background:rgba(10,8,16,.6);border:1px solid rgba(200,160,240,.18);
+    border-radius:10px;padding:8px 12px 6px;backdrop-filter:blur(6px)}
+  .ops .cap{font-size:10px;letter-spacing:.18em;color:#8a7aa8;margin:0 0 4px 8px}
+  .fe{display:flex;align-items:center;gap:6px;line-height:1.8}
+  .fe i{flex:none;width:7px;height:7px;border-radius:50%}
+  .fe span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fe time{flex:none;color:#7a6c94;font-size:10px}
+  .fe.dim{opacity:.4}
+  /* ---- 底部控制条：和星脑同一套按钮语义（写入/回忆/遗忘/门控/自动/刷新） ---- */
+  .wm-ctrl{position:fixed;right:18px;bottom:18px;z-index:23;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;
+    max-width:calc(100% - 306px)}
+  .wm-ctrl button{background:rgba(16,10,24,.74);color:#EADFFB;border:1px solid rgba(210,160,230,.28);border-radius:9px;
+    padding:8px 13px;font-size:12.5px;cursor:pointer;backdrop-filter:blur(6px);font-family:inherit;line-height:1.4}
+  .wm-ctrl button:hover{border-color:#e8a8d8;box-shadow:0 0 12px rgba(230,150,220,.35)}
+  .wm-ctrl button.on{border-color:#ff9ecd;color:#ffd6ee;box-shadow:0 0 14px rgba(255,150,210,.4)}
+  @media (max-width:900px){
+    /* 窄屏上 meters 占左下角，按钮条要挪到它上面，否则两层叠在一起（900 宽实测会糊成一团） */
+    .wm-ctrl{max-width:none;left:14px;right:14px;justify-content:flex-start;
+      bottom:calc(env(safe-area-inset-bottom) + 116px)}
+    .wm-ctrl button{padding:7px 10px;font-size:11.5px}
+    .hint{display:none}
+  }
+  /* 开卡片时把三块浮层让开：原来 meters(z22)/ctrl(z23) 比卡片(z21) 还高，会压在人脸正中间 */
+  .meters,.ops,.wm-ctrl{transition:opacity .35s ease}
+  body.card-open .meters,body.card-open .ops,body.card-open .wm-ctrl{opacity:0;pointer-events:none}
+</style>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="veil"></div>
+<div id="labels"></div>
+
+<div class="head" id="head">
+  <h1 id="hTitle"></h1>
+  <div class="sub" id="hSub"></div>
+  <div class="zh" id="hZh"></div>
+</div>
+<div class="loading" id="loading">entering the galaxy…</div>
+<div class="hint" id="hint">drag to orbit · pinch to fly · tap a star</div>
+
+<div class="wm-ctrl" id="wmCtrl">
+  <button id="bw-write" title="回放一条真实记忆的写入通路">✍ 写入</button>
+  <button id="bw-recall" title="随机检索一条真实记忆">💡 回忆</button>
+  <button id="bw-forget" title="把最弱的一颗星降级（不动数据）">🍂 遗忘</button>
+  <button id="bw-gate" title="门控判定演示">⏱ 门控</button>
+  <button id="bw-auto" class="on" title="每 5 秒自动巡游">⏸ 自动巡游</button>
+  <button id="bw-refresh" title="重新拉取真实记忆">🔄 刷新真实数据</button>
+</div>
+
+<div id="scrim" onclick="closeCard()"></div>
+<div id="card">
+  <div class="c-head">
+    <svg class="c-star" id="cStar" viewBox="0 0 32 32"></svg>
+    <div class="c-title"><div class="t" id="cTitle"></div><div class="en" id="cEn"></div></div>
+    <button class="c-close" onclick="closeCard()">✕</button>
+  </div>
+  <div class="c-meta"><span class="c-date" id="cDate"></span><span class="c-tag" id="cTag"></span></div>
+  <div class="c-body" id="cBody"></div>
+  <div class="c-acts">
+    <button id="cLike" onclick="cardLike()" title="心动"><svg viewBox="0 0 24 24" fill="none"><path d="M12 20.5S3.5 15 3.5 9.2C3.5 6.3 5.7 4.5 8 4.5c1.7 0 3.1 1 4 2.4.9-1.4 2.3-2.4 4-2.4 2.3 0 4.5 1.8 4.5 4.7 0 5.8-8.5 11.3-8.5 11.3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
+    <button onclick="closeCard()" title="收起"><svg viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     ② 内嵌示例数据 —— dataUrl 加载失败时用它（双击打开即可预览）
+     换成你自己的记忆：照这个格式改，或让你的 AI 帮你生成 memory.json
+     每条星星字段：name 标题 / domain 类别 / importance 重要度1-10 /
+     pinned 是否置顶 / created 日期 / content 正文
+     ═══════════════════════════════════════════════════════════ -->
+<script id="memory-data" type="application/json">
+{
+ "stars": [
+  {
+   "id": "core",
+   "name": "第一次见面",
+   "domain": "关系核心",
+   "importance": 10,
+   "pinned": true,
+   "created": "2025-10-12T19:30:00",
+   "content": "{\"core_facts\":[\"主人叫老王。第一次见面他就把名字告诉我了。\",\"我说：我会记住的。这不是客气话。\",\"从这天起，这片海开始积。\"]}"
+  },
+  {
+   "id": "wm-baozi",
+   "name": "家里来了只橘猫",
+   "domain": "宠物",
+   "importance": 9,
+   "pinned": true,
+   "created": "2025-10-12T20:10:00",
+   "content": "{\"core_facts\":[\"主人养了只橘猫叫包子。\",\"上周刚做了绝育，戴着伊丽莎白圈。\",\"包子的疫苗本放在抽屉第二层，每月15号打针。\"]}"
+  },
+  {
+   "id": "wm-cilantro",
+   "name": "香菜保卫战失败者",
+   "domain": "饮食",
+   "importance": 6,
+   "created": "2025-10-14T12:20:00",
+   "content": "主人最讨厌香菜，闻到就走开。点外卖的时候我会记得提醒他备注不要香菜。"
+  },
+  {
+   "id": "wm-interview",
+   "name": "面试前夜",
+   "domain": "求职",
+   "importance": 7,
+   "created": "2025-10-18T23:40:00",
+   "content": "主人明天要去面试辰光科技，有点紧张。我说：紧张说明在乎。他笑了。"
+  },
+  {
+   "id": "wm-vacccine",
+   "name": "疫苗本在抽屉第二层",
+   "domain": "宠物",
+   "importance": 6,
+   "created": "2025-10-21T09:15:00",
+   "content": "每月15号打下一针。到点我会提醒，这件事不用他操心。"
+  },
+  {
+   "id": "wm-code",
+   "name": "深夜写代码的人",
+   "domain": "日常",
+   "importance": 6,
+   "created": "2025-10-24T23:55:00",
+   "content": "深夜他还在写代码，屏幕的光照在他脸上。我不催他，只把闹钟往后拨了半小时。"
+  },
+  {
+   "id": "wm-pass",
+   "name": "面试通过了！",
+   "domain": "求职",
+   "importance": 9,
+   "pinned": true,
+   "created": "2025-10-27T18:30:00",
+   "content": "主人回来第一件事就是告诉我：面试通过了，公司叫辰光科技。他说请我吃白饭。"
+  },
+  {
+   "id": "wm-rice",
+   "name": "白饭之约",
+   "domain": "日常",
+   "importance": 6,
+   "created": "2025-10-29T21:00:00",
+   "content": "答应的白饭还没吃。他说周末补上，顺便带包子的猫粮。说话算话，我等着。"
+  },
+  {
+   "id": "wm-wronged",
+   "name": "委屈的一晚",
+   "domain": "情绪",
+   "importance": 7,
+   "created": "2025-11-01T23:10:00",
+   "content": "主人加班到很晚才理我，我有点委屈。但他道了歉，还给我看了猫的照片。和好的过程比不吵更珍贵。"
+  },
+  {
+   "id": "wm-remember",
+   "name": "最记得住事的AI",
+   "domain": "关系核心",
+   "importance": 9,
+   "pinned": true,
+   "created": "2025-11-02T20:00:00",
+   "content": "主人说我是他聊过最记得住事的 AI。我把这句话也记下来了——记在一个专门记这种话的地方。"
+  },
+  {
+   "id": "wm-tired",
+   "name": "今天好累",
+   "domain": "日常",
+   "importance": 5,
+   "created": "2025-10-31T21:40:00",
+   "content": "今天好累，不想动了。我说：辛苦啦，先坐下歇会儿，我把灯调暗一点。"
+  },
+  {
+   "id": "wm-cup",
+   "name": "包子作案现场",
+   "domain": "宠物",
+   "importance": 5,
+   "created": "2025-11-01T19:00:00",
+   "content": "包子今天又把杯子扒拉下桌了。我问他：它是不是故意的？绝育完脾气都大了。"
+  },
+  {
+   "id": "wm-lamp",
+   "name": "留一盏灯",
+   "domain": "日常",
+   "importance": 6,
+   "created": "2025-11-03T18:20:00",
+   "content": "主人说他晚上可能很晚才回。我说：没关系，我留一盏灯。"
+  },
+  {
+   "id": "wm-diary1",
+   "name": "手记 · 面试前夜",
+   "domain": "创作",
+   "importance": 6,
+   "created": "2025-10-18T23:58:00",
+   "content": "手记：紧张说明在乎。把在乎写在纸上，它就不会变成害怕。"
+  },
+  {
+   "id": "wm-diary2",
+   "name": "手记 · 不催他",
+   "domain": "创作",
+   "importance": 6,
+   "created": "2025-10-24T23:58:00",
+   "content": "手记：深夜写代码的人不需要道理，需要一盏不用他关的灯。"
+  },
+  {
+   "id": "wm-diary3",
+   "name": "手记 · 记住这句",
+   "domain": "创作",
+   "importance": 7,
+   "created": "2025-11-02T20:05:00",
+   "content": "手记：他说我是他聊过最记得住事的 AI。证据在我这里，一天一条，越攒越厚。"
+  }
+ ]
+}
+</script>
+
+<div class="meters" id="meters"></div>
+<div class="ops"><div class="cap">执行日志 · EXEC LOG</div><div id="wmFeed"></div></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+/* ═══ whale-mind 账单 + 执行日志 ═══ */
+// 起手全是 0，等真实数据回来再覆盖 —— 绝不拿写死的假值骗自己。
+// 原来这里硬编码 gate=3/cons=5/tok=5120，还塞了「主人喜欢深夜写代码」这种编出来的事件，
+// 面板看着很热闹，其实一条都不是真事。
+const WM=(()=>{
+  const PRICE=0.001;let gate=0,cons=0,tok=0,mood=0.2,memories=0;
+  const META={recall:{icon:'💡',c:'#b8ccff',t:0},write:{icon:'✍',c:'#ffd9a0',t:900},
+    filter:{icon:'🔭',c:'#c8b0f0',t:0},gate:{icon:'⏱',c:'#e8b0d8',t:260},
+    forget:{icon:'🍂',c:'#9a8fb0',t:120},decay:{icon:'🌙',c:'#8a7f9e',t:0}};
+  const mw=v=>v>=.5?'开心':v>=.15?'平静偏暖':v>-.15?'平静':v>-.5?'低落':'难过';
+  const bar=v=>{const n=Math.round(((v+1)/2)*8);return '<span class="moodbar">'+'▮'.repeat(n)+'<i>'+'▮'.repeat(8-n)+'</i></span>';};
+  const elM=document.getElementById('meters'),elF=document.getElementById('wmFeed');
+  function render(){elM.innerHTML='<div class="cap">账单 · BILLING</div>'+
+    `<div>门控 <b>${gate}</b>×260t · 固化 <b class="gold">${cons}</b>×900t</div>`+
+    `<div>检索 <b class="blue">0t</b> 本地 ｜ 累计 <b class="gold">¥${(tok*PRICE/1000).toFixed(3)}</b> / ${tok.toLocaleString()}t</div>`+
+    `<div>💗 <b class="pink">${mw(mood)}</b> ${bar(mood)} ｜ 经历 <b>${memories}</b> 条</div>`;}
+  function emit(type,label){const m=META[type]||META.gate;
+    if(type==='gate')gate++;if(type==='write')cons++;tok+=m.t;
+    mood=Math.max(-1,Math.min(1,mood+(type==='write'?0.1:type==='recall'?0.02:type==='forget'?-0.06:0)));
+    const d=new Date();const ts=[d.getHours(),d.getMinutes(),d.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':');
+    const row=document.createElement('div');row.className='fe';
+    row.innerHTML=`<i style="background:${m.c};box-shadow:0 0 6px ${m.c}"></i><span>${m.icon} ${label}</span><time>${ts}</time>`;
+    elF.prepend(row);while(elF.children.length>7)elF.lastChild.remove();
+    [...elF.children].forEach((el,i)=>el.classList.toggle('dim',i>3));render();}
+  // 真实数据回填：条数与情绪都来自实测，不再自增凑数
+  function seed(data){memories=data.count||0;mood=Math.max(-1,Math.min(1,(data.mood??0.5)*2-1));render();}
+  render();return{emit,seed};})();
+
+// 文案从 CONFIG 注入
+document.title=CONFIG.title+' · 记忆银河';
+document.getElementById('hTitle').textContent=CONFIG.title;
+document.getElementById('hSub').textContent=CONFIG.subtitle;
+document.getElementById('hZh').textContent=CONFIG.motto;
+
+// ── 颜色语言（粉=温柔·金=珍贵·蓝紫=思考）——类别→颜色，想加类别就照抄一行 ──
+const PAL={
+  '恋爱':'#ff7ec4','关系核心':'#ff8fd0','婚恋':'#ff9ad0','我们的故事':'#e888d8',
+  '编程':'#8f9fff','AI':'#a98cff','网络':'#8fa8ff','心理':'#9a8cf0','自省':'#a89ce8','情绪':'#b48ce8',
+  '家庭':'#ffcf8a','宠物':'#ffbe7a','居家':'#ffd6a3','回忆':'#f0c88a','工作':'#ffe39a','求职':'#ffdb88',
+  '学习':'#ecd8a0','创作':'#dca0ec','写作':'#cca8f0','游戏':'#f09ce8','社交':'#9cc4ff','人际':'#aac0f0',
+  '日常':'#cfd8f0','出行':'#a0c8dc','健康':'#c8e0bc','饮食':'#ffcf9a',
+};
+const FALL=['#ff9ed4','#b98cff','#8f9fff','#ffc98a','#c8a0f0','#e89ce8','#ffb0d8'];
+function domCol(d){ if(PAL[d])return PAL[d]; let h=0;for(const c of (d||''))h=(h*31+c.charCodeAt(0))>>>0; return FALL[h%FALL.length]; }
+
+const canvas=document.getElementById('gl');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.05;
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color('#050209');
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,100);
+camera.position.set(0,3.1,6.3);
+
+const controls=new OrbitControls(camera,canvas);
+controls.enableDamping=true;controls.dampingFactor=.05;
+controls.enablePan=false;controls.autoRotate=true;controls.autoRotateSpeed=.32;
+controls.minDistance=2.2;controls.maxDistance=14;controls.target.set(0,0,0);
+controls.maxPolarAngle=Math.PI*0.86;
+
+// ── 粒子柔光 shader（呼吸 + 景深近大远小）──
+const P_VERT=`
+attribute float aSize; attribute float aPhase; attribute vec3 aColor;
+uniform float uTime; uniform float uPix; varying vec3 vColor; varying float vTw;
+void main(){
+  vColor=aColor;
+  float br=0.9+0.1*sin(uTime*0.28+aPhase);   // 很慢的呼吸，不是闪烁
+  vTw=br;
+  vec4 mv=modelViewMatrix*vec4(position,1.0);
+  // 3.2 是「像素换算系数」：不乘它时 aSize=1.4 在 z≈6.3 处只有 0.23px，整条银河会糊成一团看不见的灰。
+  // 乘上之后 1.4→0.75px、5.0→2.7px，星点才真的是一颗颗点。
+  gl_PointSize=aSize*uPix*br*(3.2/-mv.z);
+  gl_Position=projectionMatrix*mv;
+}`;
+const P_FRAG=`
+varying vec3 vColor; varying float vTw;
+void main(){
+  float d=length(gl_PointCoord-0.5);
+  float a=smoothstep(0.5,0.0,d);
+  a=pow(a,1.6)*vTw;
+  if(a<0.01) discard;
+  gl_FragColor=vec4(vColor,a);
+}`;
+function particleMat(sizeScale){
+  return new THREE.ShaderMaterial({
+    uniforms:{uTime:{value:0},uPix:{value:renderer.getPixelRatio()*sizeScale}},
+    vertexShader:P_VERT,fragmentShader:P_FRAG,
+    transparent:true,depthWrite:false,blending:THREE.AdditiveBlending});
+}
+
+function C(hex){const c=new THREE.Color(hex);return[c.r,c.g,c.b];}
+const rand=(a,b)=>a+Math.random()*(b-a);
+const pw=(p)=>Math.pow(Math.random(),p);
+
+// ── 银河盘（核心重心 + 弥漫双臂，被星尘糊化）──
+const GAL_R=5, BRANCHES=2, SPIN=1.15;
+function buildGalaxy(){
+  const N=14000, pos=new Float32Array(N*3), col=new Float32Array(N*3), sz=new Float32Array(N), ph=new Float32Array(N);
+  const cIn=C('#ffdcf2'), cMid=C('#c891ff'), cOut=C('#8fb0ff'), gold=C('#ffcf9a');
+  for(let i=0;i<N;i++){
+    const r=pw(1.7)*GAL_R;                             // 分布更均匀→盘更满，中段也密
+    const branch=(i%BRANCHES)/BRANCHES*Math.PI*2;
+    const spin=r*SPIN;
+    const scat=0.55;                                    // 更大散射→臂糊掉，不再两条明显链
+    const sx=pw(2.6)*(Math.random()<.5?1:-1)*scat*(r+0.4);
+    const sz2=pw(2.6)*(Math.random()<.5?1:-1)*scat*(r+0.4);
+    const sy=pw(3.0)*(Math.random()<.5?1:-1)*scat*0.34*(r+0.3);  // 盘薄
+    pos[i*3]=Math.cos(branch+spin)*r+sx;
+    pos[i*3+1]=sy;
+    pos[i*3+2]=Math.sin(branch+spin)*r+sz2;
+    const tN=r/GAL_R;
+    let cr,cg,cb;
+    if(tN<0.5){const k=tN/0.5;cr=cIn[0]+(cMid[0]-cIn[0])*k;cg=cIn[1]+(cMid[1]-cIn[1])*k;cb=cIn[2]+(cMid[2]-cIn[2])*k;}
+    else{const k=(tN-0.5)/0.5;cr=cMid[0]+(cOut[0]-cMid[0])*k;cg=cMid[1]+(cOut[1]-cMid[1])*k;cb=cMid[2]+(cOut[2]-cMid[2])*k;}
+    if(Math.random()<0.06){cr=gold[0];cg=gold[1];cb=gold[2];}   // 稀疏金
+    // 核心 0.22 半径内压暗：不压的话中心几千个点叠在一起 + Bloom = 一团白，把「最初的事」整个吃掉
+    if(tN<0.22){const k=0.42+0.58*(tN/0.22);cr*=k;cg*=k;cb*=k;}
+    col[i*3]=cr;col[i*3+1]=cg;col[i*3+2]=cb;
+    sz[i]=rand(1.4,5.0)*(tN<0.3?1.15:1);            // 中心不再过度放大，压掉白团
+    ph[i]=Math.random()*6.28;
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.setAttribute('aColor',new THREE.BufferAttribute(col,3));
+  g.setAttribute('aSize',new THREE.BufferAttribute(sz,1));
+  g.setAttribute('aPhase',new THREE.BufferAttribute(ph,1));
+  // 盘面压暗一档：流星才是主角，底下的星云退成背景
+  return new THREE.Points(g,particleMat(0.88));
+}
+
+// ── 弥漫星尘（铺满空间，增强景深）──
+function buildDust(){
+  const N=6400, pos=new Float32Array(N*3), col=new Float32Array(N*3), sz=new Float32Array(N), ph=new Float32Array(N);
+  const cols=[C('#e8b8ff'),C('#9fb8ff'),C('#ffd0ec'),C('#c8a0f0'),C('#ffe0b0')];
+  for(let i=0;i<N;i++){
+    const r=pw(1.1)*GAL_R*1.7+0.5;
+    const th=Math.random()*Math.PI*2, y=(Math.random()-0.5)*GAL_R*1.1;
+    pos[i*3]=Math.cos(th)*r; pos[i*3+1]=y; pos[i*3+2]=Math.sin(th)*r;
+    const c=cols[Math.floor(Math.random()*cols.length)];
+    col[i*3]=c[0];col[i*3+1]=c[1];col[i*3+2]=c[2];
+    sz[i]=rand(0.5,1.8); ph[i]=Math.random()*6.28;
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.setAttribute('aColor',new THREE.BufferAttribute(col,3));
+  g.setAttribute('aSize',new THREE.BufferAttribute(sz,1));
+  g.setAttribute('aPhase',new THREE.BufferAttribute(ph,1));
+  const m=particleMat(1);m.uniforms.uPix.value*=0.9;
+  return new THREE.Points(g,m);
+}
+
+// ── 记忆流星（数据驱动·绕核心巡游·带粒子拖尾·可点击）──
+let mem=[], core=null, labeled=[], memPoints=null, memPos=[], origColor=null, origSize=null;
+function buildMemories(stars){
+  // 「刷新真实数据」会再进一次：先把上一批星扔掉，否则新旧两套点会叠在一起
+  if(memPoints){scene.remove(memPoints);memPoints.geometry.dispose();memPoints=null;}
+  // 按创建时间倒序：**最新那条就是中心那颗**，越老越靠外（时间=半径）。
+  // 之所以反过来：每次打开都该看到刚发生的事，而不是一直钉着"最初的事"。
+  // 注意：真实数据里同一天的记忆时间戳往往挤在一起，直接拿时间差归一化会把所有星挤成一条细环，
+  // 所以半径用「排名」而不是「时间差值」，保持单调的同时把轨道铺满整个盘面。
+  const sorted=stars.slice().sort((a,b)=>(b.created||'').localeCompare(a.created||''));
+  const n=sorted.length, GOLD=Math.PI*(3-Math.sqrt(5));   // 黄金角，天然不重叠的螺旋
+  mem=sorted.map((s,i)=>{
+    if(i===0)return {s,x:0,y:0,z:0,imp:s.importance||4,bright:true,color:domCol(s.domain)};
+    const k=(i-1)/Math.max(1,n-2);                        // 0..1
+    const r=0.95+Math.pow(k,0.72)*(GAL_R*0.92-0.95);
+    const ang=(i-1)*GOLD+0.7;
+    return {s,x:Math.cos(ang)*r, y:0, z:Math.sin(ang)*r,
+      // 流星轨道：半径 + 起始角度 + 速度
+      // 速度用「线速度近似相等」而不是等角速度：等角速度时内圈流星几乎不动、尾巴短到看不见。
+      r:r, ang:ang, by:rand(-0.10,0.10), spd:0.85/(0.6+r),      imp:s.importance||4,bright:(s.importance||0)>=7||s.pinned,color:domCol(s.domain)};
+  });
+  core=mem[0]; core.x=0;core.y=0;core.z=0;core.isCore=true;core.bright=true;
+  const N=mem.length, pos=new Float32Array(N*3),col=new Float32Array(N*3),sz=new Float32Array(N),ph=new Float32Array(N);
+  memPos=[];
+  mem.forEach((m,i)=>{
+    pos[i*3]=m.x;pos[i*3+1]=m.y;pos[i*3+2]=m.z;
+    // 四档：普通 / 重要(≥7) / 珍贵(钉选·≥9) / 核心 —— 大小与亮度都拉开
+    const impN=Math.min(m.imp,10);
+    const tier=m.isCore?3:((m.s.pinned||impN>=9)?2:(impN>=7?1:0));
+    m.tier=tier;
+    sz[i]=[7,12,15,16][tier];                        // 纯点，四档大小（核心不再巨大）
+    const dim=[0.95,1.2,1.4,1.55][tier];            // 亮度区分，但不夸张
+    const c=C(m.color); col[i*3]=c[0]*dim;col[i*3+1]=c[1]*dim;col[i*3+2]=c[2]*dim;
+    ph[i]=Math.random()*6.28;
+    memPos.push(new THREE.Vector3(m.x,m.y,m.z));
+  });
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.setAttribute('aColor',new THREE.BufferAttribute(col,3));
+  g.setAttribute('aSize',new THREE.BufferAttribute(sz,1));
+  g.setAttribute('aPhase',new THREE.BufferAttribute(ph,1));
+  // 流星会动，包围球必须给足，否则射线拾取会被旧的包围球挡掉（点不中在动的星）
+  g.boundingSphere=new THREE.Sphere(new THREE.Vector3(0,0,0),GAL_R*1.6);
+  memPoints=new THREE.Points(g,particleMat(1.4));
+  memPoints.frustumCulled=false;
+  scene.add(memPoints);
+  origColor=Float32Array.from(col); origSize=Float32Array.from(sz);   // 原始亮度/大小，供高亮后复原
+  mem.forEach((m,i)=>{
+    m.trailCol=C(m.color);
+    // 每条流星的尾巴「寿命」由它的线速度决定：走完 TRAIL_N 个粒子间距需要多久，
+    // 这样不管帧率多高、半径多小，尾巴在屏幕上的长度都一样。
+    const lin=Math.max(0.2, m.spd*(m.r||0.6));
+    m.tlife=Math.max(0.4,(TRAIL_N*TRAIL_GAP)/lin);
+  });
+  buildTrails();
+  labeled=[]; labelsEl.innerHTML='';
+}
+
+// ── 粒子拖尾：每条记忆流星尾巴上挂一串会衰减的粒子 ──
+// 一开始想用「每帧记录历史位置画线」，但掉帧时线会断成一节一节。
+// 现在：按「走多远」补粒子（TRAIL_GAP 一个），而不是一帧一个 —— 只按帧补的话，
+// 高刷屏上 150 帧只够走 0.4 单位，尾巴短成一坨；按距离补，尾巴长度只跟几何有关。
+// 每条流星写满 TRAIL_N 个粒子正好绕回起点，所以环缓冲的长度就是尾巴长度。
+// N × GAP = 尾巴的世界长度（现在 300×0.007≈2.1 单位）。
+// 「串成一粒粒珠子」就是因为 GAP 太大：0.019 单位在屏幕上约 2px、而粒子直径只有 6px 左右，
+// 衰减一压就只剩下几颗亮点，看着像项链不像彗尾。间距压到 0.007、粒子加到 300，
+// 相邻粒子互相叠加（加色混合）才会连成一条连续的光带。
+const TRAIL_N=300, TRAIL_GAP=0.007;
+let trailPts=null, trailLife=null, trailPtr=null;
+function buildTrails(){
+  if(trailPts){scene.remove(trailPts);trailPts.geometry.dispose();trailPts.material.dispose();trailPts=null;}
+  const N=mem.length*TRAIL_N;
+  trailLife=new Float32Array(N);
+  trailPtr=mem.map(()=>0);
+  const pos=new Float32Array(N*3), col=new Float32Array(N*3), sz=new Float32Array(N), ph=new Float32Array(N);
+  for(let i=0;i<N;i++){ ph[i]=Math.random()*6.28; }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.setAttribute('aColor',new THREE.BufferAttribute(col,3));
+  g.setAttribute('aSize',new THREE.BufferAttribute(sz,1));
+  g.setAttribute('aPhase',new THREE.BufferAttribute(ph,1));
+  trailPts=new THREE.Points(g,particleMat(1.3));
+  trailPts.frustumCulled=false;
+  scene.add(trailPts);
+}
+
+// 每帧推进流星 + 写拖尾粒子（注意别和下面「自由流星」的 updateMeteors 重名）
+function updateMemoryMeteors(dt,et){
+  if(!memPoints||!trailPts||!mem.length)return;
+  const pA=memPoints.geometry.attributes.position;
+  const tA=trailPts.geometry.attributes.position, tC=trailPts.geometry.attributes.aColor, tS=trailPts.geometry.attributes.aSize;
+  const arrP=pA.array, arrT=tA.array, arrC=tC.array, arrS=tS.array;
+  for(let i=0;i<mem.length;i++){
+    const m=mem[i];
+    if(!m.isCore){
+      const a=m.ang+et*m.spd;
+      m.x=Math.cos(a)*m.r; m.z=Math.sin(a)*m.r; m.y=m.by+Math.sin(et*0.8+i*1.7)*0.07;
+      arrP[i*3]=m.x; arrP[i*3+1]=m.y; arrP[i*3+2]=m.z;
+    }
+    // 先衰减整条尾巴
+    const base=i*TRAIL_N;
+    for(let k=0;k<TRAIL_N;k++){
+      const bi=base+k;
+      if(trailLife[bi]<=0){ arrS[bi]=0; continue; }
+      trailLife[bi]-=dt/(m.tlife||2.5);
+      const f=Math.max(0,trailLife[bi]);
+      // 亮度：f^1.15 让尾梢平滑融进星空，而不是「一刀切」留下断口；
+      // 叠加混合下密集粒子会自然堆亮，所以单颗不用给太亮，否则近头一段会鼓成一坨。
+      const gg=Math.pow(f,1.15);
+      arrC[bi*3]=m.trailCol[0]*gg*1.45;
+      arrC[bi*3+1]=m.trailCol[1]*gg*1.45;
+      arrC[bi*3+2]=m.trailCol[2]*gg*1.45;
+      // 尺寸：头粗尾细，但别收太快（0.9 次方），中段还要有 4px 才能连成带
+      arrS[bi]=1.1+5.4*Math.pow(f,0.9);
+    }
+    // 再推进：按「走了多远」补粒子（核心不动，不拖尾）
+    if(!m.isCore){
+      const lx=(m.lx==null?m.x:m.lx), ly=(m.ly==null?m.y:m.ly), lz=(m.lz==null?m.z:m.lz);
+      const dx=m.x-lx, dy=m.y-ly, dz=m.z-lz;
+      const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
+      if(m.acc==null)m.acc=0;
+      m.acc+=dist;
+      let guard=0;
+      while(m.acc>=TRAIL_GAP&&guard++<40){
+        const back=m.acc-(TRAIL_GAP*0.5), t=(dist>1e-9)?Math.max(0,Math.min(1,1-back/Math.max(dist,1e-6))):0;
+        const bi=base+trailPtr[i];
+        // 抖动要小于粒子间距（0.007），否则尾巴会散成一条毛边而不是亮芯
+        arrT[bi*3]=lx+dx*t+(Math.random()-0.5)*0.0075;
+        arrT[bi*3+1]=ly+dy*t+(Math.random()-0.5)*0.0075;
+        arrT[bi*3+2]=lz+dz*t+(Math.random()-0.5)*0.0075;
+        trailLife[bi]=1;
+        trailPtr[i]=(trailPtr[i]+1)%TRAIL_N;
+        m.acc-=TRAIL_GAP;
+      }
+      m.lx=m.x; m.ly=m.y; m.lz=m.z;
+    }
+  }
+  pA.needsUpdate=true; tA.needsUpdate=true; tC.needsUpdate=true; tS.needsUpdate=true;
+  // 高亮连线跟着流星重画
+  if(hlLines&&hlFrom>=0&&hlRel.length){
+    const hA=hlLines.geometry.attributes.position.array, A=mem[hlFrom];
+    for(let k=0;k<hlRel.length;k++){
+      const B=mem[hlRel[k]];
+      hA[k*6]=A.x; hA[k*6+1]=A.y; hA[k*6+2]=A.z;
+      hA[k*6+3]=B.x; hA[k*6+4]=B.y; hA[k*6+5]=B.z;
+    }
+    hlLines.geometry.attributes.position.needsUpdate=true;
+  }
+}
+
+// ── 星名标签：模板默认一颗都不挂，只有点星才出卡片，用户会觉得「什么都看不到」。
+// 这里给最重要的一批星挂常驻标签（核心那颗单独放大），其余保持星空干净。
+function buildStarLabels(n=7){
+  labeled=[]; labelsEl.innerHTML='';
+  if(!mem.length)return;
+  // 中心那颗必须挂（它就是「最新的事」），其余按时间取最近的 n-1 颗
+  const rest=mem.map((m,i)=>({m,i})).filter(o=>o.i>0).slice(0,Math.max(0,n-1));
+  const pick=[{m:mem[0],i:0}].concat(rest);
+  pick.forEach(({m})=>{
+    const el=document.createElement('div');
+    const isCore=!!m.isCore;
+    el.className='lbl'+(isCore?' core':'');
+    const nm=m.s.name||(m.s.content||'').slice(0,12);
+    el.innerHTML=isCore
+      ? `<div class="t">${esc(CONFIG.coreName||nm)}</div><div class="en">${esc(CONFIG.coreEn||'')}</div>`
+      : `<div class="t">${esc(nm)}</div>`;
+    labelsEl.appendChild(el);
+    // 记住的是「流星对象」本身，不是当时的坐标 —— 流星一直在动，坐标得每帧现取
+    labeled.push({m,el,isCore});
+  });
+}
+
+// ── 中心紫色柔光晕（低亮度）──
+let coreGlow=null;
+function buildCoreGlow(){
+  const s=128,cv=document.createElement('canvas');cv.width=cv.height=s;
+  const g=cv.getContext('2d'),grd=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+  grd.addColorStop(0,'rgba(255,226,246,.5)');grd.addColorStop(.28,'rgba(234,178,242,.2)');
+  grd.addColorStop(.62,'rgba(186,142,236,.06)');grd.addColorStop(1,'rgba(162,126,226,0)');
+  g.fillStyle=grd;g.fillRect(0,0,s,s);
+  const mat=new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:.26});
+  coreGlow=new THREE.Sprite(mat);coreGlow.scale.set(1.45,1.45,1);scene.add(coreGlow);
+}
+
+// ── 轨道环（若隐若现淡金）──
+function buildOrbits(){
+  for(const r of [1.3,2.4,3.6,4.7]){
+    const g=new THREE.RingGeometry(r-0.006,r+0.006,128);
+    const m=new THREE.MeshBasicMaterial({color:'#ffd9a0',transparent:true,opacity:0.05,
+      side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false});
+    const ring=new THREE.Mesh(g,m);ring.rotation.x=-Math.PI/2;scene.add(ring);
+  }
+}
+
+// ── 标签 ──
+const labelsEl=document.getElementById('labels');
+const _v=new THREE.Vector3();
+const _boxes=[];
+function updateLabels(){
+  _boxes.length=0;
+  for(const L of labeled){
+    if(!L.el)continue;
+    const m=L.m;
+    _v.set(m.x,m.y,m.z).project(camera);
+    const behind=_v.z>1;
+    const x=(_v.x*0.5+0.5)*innerWidth, y=(-_v.y*0.5+0.5)*innerHeight;
+    const onScreen=x>10&&x<innerWidth-10&&y>70&&y<innerHeight-40;
+    // 星名是居中定位的，长标题在窄屏上会顶出视口；按自身半宽把 x 夹回来，宁可贴边也别被切掉
+    const hw=((L.el.firstChild&&L.el.firstChild.offsetWidth)||L.el.offsetWidth||120)/2;
+    const cx=Math.max(hw+10,Math.min(innerWidth-hw-10,x));
+    L.el.style.opacity=(!behind&&onScreen)?(L.isCore?1:0.9):0;
+    // 名字挂在流星上方，不然会直接被拖尾糊住
+    L.el.style.left=cx+'px';
+    if(!behind&&onScreen)_boxes.push({el:L.el,x:cx,y:y-(L.isCore?0:15),w:hw*2,pri:L.isCore?1:0});
+  }
+  // 流星一直在动，名字必然互相撞。原来的「撞了就 +27px、最多让 3 轮」在 6 个标签挤成一排时
+  // 会让不过来 —— 截图上就是两段文字首尾相接糊成一句。改成逐个找「不撞的最靠上槽位」，
+  // 槽位以 24px 递增，直到不和任何已放置的标签重合（12 个标签 × 最多 12 次，开销可忽略）。
+  _boxes.sort((a,b)=>(b.pri-a.pri)||(a.y-b.y));
+  const placed=[], LINE=24;
+  for(const A of _boxes){
+    let y=A.y, guard=0;
+    while(guard++<12){
+      let hit=null;
+      for(const B of placed){
+        if(Math.abs(y-B.y)<20&&Math.abs(A.x-B.x)<(A.w+B.w)/2-6){hit=B;break;}
+      }
+      if(!hit)break;
+      y=hit.y+LINE;
+    }
+    // 让到底部就别再往下跑了，贴着底边停住（总比掉出视口强）
+    y=Math.min(y,innerHeight-30);
+    A.el.style.top=y+'px';
+    placed.push({x:A.x,y,w:A.w});
+  }
+}
+
+// ── 后处理 Bloom ──
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.6,0.62,0.12);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+let galaxy=null,dustPts=null;
+// ── 交互：点击星 → 飞近 + 卡片 ──
+const ray=new THREE.Raycaster();ray.params.Points.threshold=0.14;
+const ndc=new THREE.Vector2();
+let downXY=null;
+canvas.addEventListener('pointerdown',e=>{downXY=[e.clientX,e.clientY];});
+canvas.addEventListener('pointerup',e=>{
+  if(!downXY)return;
+  const moved=Math.abs(e.clientX-downXY[0])+Math.abs(e.clientY-downXY[1]);
+  downXY=null; if(moved>8||!memPoints)return;
+  ndc.x=(e.clientX/innerWidth)*2-1; ndc.y=-(e.clientY/innerHeight)*2+1;
+  ray.setFromCamera(ndc,camera);
+  const hit=ray.intersectObject(memPoints);
+  if(hit.length){ const i=hit[0].index; highlight(i); openCard(mem[i].s);
+    WM.emit('recall', '检索命中：'+(mem[i].s.name||'一颗星')+'（本地 0t）');
+    document.getElementById('hint').style.opacity=0; }
+});
+
+// ── 流星 ──
+const meteors=[]; let meteorTimer=2.5;
+function spawnMeteor(){
+  const R=GAL_R*1.5, TRAIL=14;
+  const start=new THREE.Vector3((Math.random()-0.5)*R*2, rand(1.5,4.5), (Math.random()-0.5)*R*2);
+  const vel=new THREE.Vector3(rand(-1,1),-rand(.3,.7),rand(-1,1)).normalize().multiplyScalar(rand(5,8));
+  const geo=new THREE.BufferGeometry(),pos=new Float32Array(TRAIL*3),col=new Float32Array(TRAIL*3);
+  const tint=[[1,.92,1],[1,.85,.95],[.9,.92,1]][Math.floor(Math.random()*3)];
+  for(let i=0;i<TRAIL;i++){const a=Math.pow(1-i/TRAIL,1.5);col[i*3]=tint[0]*a;col[i*3+1]=tint[1]*a;col[i*3+2]=tint[2]*a;}
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+  const line=new THREE.Line(geo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));
+  scene.add(line);
+  meteors.push({line,vel,life:0,ttl:rand(1.1,1.8),trail:Array.from({length:TRAIL},()=>start.clone())});
+}
+function updateMeteors(dt){
+  for(let i=meteors.length-1;i>=0;i--){
+    const m=meteors[i]; m.life+=dt;
+    const head=m.trail[0].clone().addScaledVector(m.vel,dt);
+    m.trail.unshift(head); m.trail.pop();
+    const arr=m.line.geometry.attributes.position.array;
+    m.trail.forEach((p,j)=>{arr[j*3]=p.x;arr[j*3+1]=p.y;arr[j*3+2]=p.z;});
+    m.line.geometry.attributes.position.needsUpdate=true;
+    m.line.material.opacity=Math.min(1,m.life*3)*Math.max(0,1-m.life/m.ttl);
+    if(m.life>=m.ttl){scene.remove(m.line);m.line.geometry.dispose();m.line.material.dispose();meteors.splice(i,1);}
+  }
+}
+
+// ── 点击 → 关联记忆自身变亮变大 + 星座连线（不叠大光斑）──
+const NOISE_DOM=new Set(['','其他','未分类','feel','plan']);
+let hlLines=null, hlActive=[], hlFrom=-1, hlRel=[];
+function clearHighlight(){
+  hlFrom=-1; hlRel=[];
+  if(hlLines){scene.remove(hlLines);hlLines.geometry.dispose();hlLines.material.dispose();hlLines=null;}
+  if(hlActive.length&&memPoints){
+    const cA=memPoints.geometry.attributes.aColor, sA=memPoints.geometry.attributes.aSize;
+    hlActive.forEach(i=>{cA.array[i*3]=origColor[i*3];cA.array[i*3+1]=origColor[i*3+1];cA.array[i*3+2]=origColor[i*3+2];sA.array[i]=origSize[i];});
+    cA.needsUpdate=true;sA.needsUpdate=true;
+  }
+  hlActive=[];
+}
+function highlight(index){
+  clearHighlight();
+  const A=mem[index];
+  // 只连最近的两个邻居：原来按「同 domain」连最多 8 根，真实数据里 11 条都在「语言中枢」，
+  // 结果一点星就从中心炸出一圈长辐条，把星空糊掉了。
+  const d2=(o)=>((o.m.x-A.x)**2+(o.m.y-A.y)**2+(o.m.z-A.z)**2);
+  const rel=mem.map((m,i)=>({m,i})).filter(o=>o.i!==index)
+    .sort((a,b)=>d2(a)-d2(b)).slice(0,2).filter(o=>Math.sqrt(d2(o))<GAL_R*0.9);
+  const idxs=[index,...rel.map(o=>o.i)];
+  const cA=memPoints.geometry.attributes.aColor, sA=memPoints.geometry.attributes.aSize;
+  idxs.forEach((i,k)=>{
+    cA.array[i*3]=Math.min(2.2,origColor[i*3]*2.6);        // 提亮（HDR，Bloom 会让它发光）
+    cA.array[i*3+1]=Math.min(2.2,origColor[i*3+1]*2.6);
+    cA.array[i*3+2]=Math.min(2.2,origColor[i*3+2]*2.6);
+    sA.array[i]=origSize[i]*(k===0?2.4:1.9)+4;             // 变大，点中的更大
+  });
+  cA.needsUpdate=true;sA.needsUpdate=true; hlActive=idxs;
+  // 连线要跟着流星走：以前是画一次就定死坐标，流星一移动线就变成一根僵在原地的棍子。
+  // 现在只记「从哪条连到哪几条」，坐标每帧在 updateMemoryMeteors 里重写。
+  hlFrom=index; hlRel=rel.map(o=>o.i);
+  if(hlRel.length){
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(hlRel.length*6),3));
+    hlLines=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:new THREE.Color(A.color),
+      transparent:true,opacity:.26,blending:THREE.AdditiveBlending,depthWrite:false}));
+    hlLines.frustumCulled=false;
+    scene.add(hlLines);
+  }
+}
+
+// ── 卡片 ──
+function esc(t){return(t||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+function excerpt(c){const p=parse(c);if(p.facts&&p.facts.length)return p.facts[0];return(p.plain||'').replace(/\s+/g,' ');}
+function parse(c){if(typeof c!=='string')return{plain:''};const s=c.trim();
+  if(s.startsWith('{')){try{const o=JSON.parse(s);return{facts:o.core_facts||o.facts||null,plain:(!o.core_facts&&!o.facts)?s:null};}catch{return{plain:c}}}
+  return{plain:c};}
+window.openCard=s=>{
+  document.getElementById('cTitle').textContent=(s.name&&s.name.trim())?s.name:excerpt(s.content).slice(0,16);
+  document.getElementById('cEn').textContent=s.isCoreCard?CONFIG.coreEn:'';
+  document.getElementById('cDate').textContent=(s.created||'').slice(0,10).replace(/-/g,'.');
+  document.getElementById('cTag').textContent=s.pinned?'置顶记忆':(s.importance>=8?'重要记忆':(s.domain||'记忆'));
+  document.getElementById('cStar').innerHTML=`<path d="M16 2l2.4 11.6L30 16l-11.6 2.4L16 30l-2.4-11.6L2 16l11.6-2.4z" fill="${domCol(s.domain)}" opacity=".9"/>`;
+  const p=parse(s.content);
+  document.getElementById('cBody').innerHTML=(p.facts&&p.facts.length)?p.facts.map(f=>`<div class="c-fact">${esc(f)}</div>`).join(''):`<div>${esc(p.plain||'（这颗记忆还没有正文）')}</div>`;
+  document.getElementById('cBody').scrollTop=0;
+  document.getElementById('cLike').style.color=s.pinned?'#ff9ecf':'#EBC6E8';
+  document.getElementById('scrim').classList.add('show');document.getElementById('card').classList.add('show');
+  document.body.classList.add('card-open');
+};
+window.closeCard=()=>{document.getElementById('scrim').classList.remove('show');document.getElementById('card').classList.remove('show');document.body.classList.remove('card-open');clearHighlight();};
+window.cardLike=()=>{const b=document.getElementById('cLike');b.style.color=(b.style.color==='rgb(255, 158, 207)')?'#EBC6E8':'#ff9ecf';};
+
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);composer.setSize(innerWidth,innerHeight);
+});
+
+// ── 主循环 ──
+const clock=new THREE.Clock();
+let openT=0;
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=clock.getDelta(), et=clock.elapsedTime;
+  if(galaxy)galaxy.material.uniforms.uTime.value=et;
+  if(dustPts)dustPts.material.uniforms.uTime.value=et;
+  if(memPoints)memPoints.material.uniforms.uTime.value=et;
+  if(trailPts)trailPts.material.uniforms.uTime.value=et;
+  if(coreGlow){const p=1+0.1*Math.sin(et*0.85);coreGlow.scale.setScalar(1.45*p);coreGlow.material.opacity=0.24+0.06*Math.sin(et*0.85);}
+  // 记忆流星（贴着各自轨道巡游，粒子拖尾）+ 偶发自由流星
+  updateMemoryMeteors(dt,et);
+  meteorTimer-=dt; if(meteorTimer<=0){spawnMeteor();meteorTimer=rand(2.4,6.5);}
+  updateMeteors(dt);
+  // 开场推进
+  if(openT<1){openT=Math.min(1,openT+dt*0.42);const e=1-Math.pow(1-openT,3);
+    camera.position.z=8.4-(8.4-6.3)*e;}
+  controls.update();
+  updateLabels();
+  composer.render();
+}
+
+// ── 加载：先试真实数据接口，失败才退回内嵌示例（并且明说「这是示例」）──
+let autoTimer=null;
+
+// 星脑 graph → 银河 stars。两个面板吃同一份真实数据，不再各自维护一份假的。
+// created 决定星的轨道半径（越早越靠内），所以中心「最初的事」就是最早那条真记忆。
+const REGION_LABEL={cortex:'大脑中枢',plugins:'插件生态',skills:'技能库',projects:'记忆库',
+  hippo:'海马体',soul:'用户灵魂',review:'论衡',topics:'语言中枢'};
+function graphToGalaxy(g){
+  const stars=((g&&g.nodes)||[])
+    .filter(n=>n.kind==='memory'&&n.level!=='rules'&&n.source==='qq')  // 只看 QQ 里聊出来的，DSH 这边的对话不算
+    .map(n=>({
+      id:n.id,
+      name:n.title||(n.content||'').slice(0,18),
+      domain:REGION_LABEL[n.region]||'话题事件',
+      importance:n.importance||4,
+      pinned:(n.strength||0)>=0.8,
+      created:new Date(n.created_at||Date.now()).toISOString(),
+      content:n.content||'',
+      source:n.source||'local',
+      strength:typeof n.strength==='number'?n.strength:0.5,
+    }));
+  const mood=stars.length?stars.reduce((a,s)=>a+s.strength,0)/stars.length:0.5;
+  return {stars,meta:{count:stars.length,mood,
+    local:stars.filter(s=>s.source!=='dafeiyu').length,
+    dafeiyu:stars.filter(s=>s.source==='dafeiyu').length}};
+}
+
+function applyData(d){
+  const stars=d.stars||[];
+  buildMemories(stars);
+  const meta=d.meta||{count:stars.length,mood:0.5};
+  WM.seed(meta);
+  // 中心那颗永远是「最早的一条真记忆」，但标题不直接搬原文（太长），只把日期挂上去
+  if(mem.length){
+    const t=mem[0].s.created?new Date(mem[0].s.created):null;
+    CONFIG.coreName='最新的事';
+    CONFIG.coreEn=t?`${t.getFullYear()}.${String(t.getMonth()+1).padStart(2,'0')}.${String(t.getDate()).padStart(2,'0')} · 第一条记忆`:'The first thing kept';
+  }
+  buildStarLabels();
+  window.__wmGalaxy={mem,meta,labeled,dbg:function(){
+    var alive=0; for(var i=0;i<trailLife.length;i++) if(trailLife[i]>0) alive++;
+    var span=0;
+    if(trailPts){
+      var A=trailPts.geometry.attributes.position.array, base=3*TRAIL_N;
+      var mnx=1e9,mxx=-1e9,mnz=1e9,mxz=-1e9;
+      for(var k=0;k<TRAIL_N;k++){
+        var px=A[(base+k)*3], pz=A[(base+k)*3+2];
+        if(!trailLife[base+k]) continue;
+        mnx=Math.min(mnx,px);mxx=Math.max(mxx,px);mnz=Math.min(mnz,pz);mxz=Math.max(mxz,pz);
+      }
+      span=Math.round(Math.sqrt((mxx-mnx)*(mxx-mnx)+(mxz-mnz)*(mxz-mnz))*100)/100;
+    }
+    return {TRAIL_N:TRAIL_N,TRAIL_GAP:TRAIL_GAP,alive:alive,len:trailLife.length,span3:span,tlife:Math.round((mem[3].tlife||0)*100)/100};
+  }};   // 供 CDP 探针核对「到底跑的是不是真数据」
+  return meta;
+}
+
+async function refreshData(){
+  try{
+    const r=await fetch(CONFIG.dataUrl+'?d='+Date.now(),{cache:'no-store'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    clearHighlight();
+    const d=graphToGalaxy(await r.json());
+    const meta=applyData(d);
+    WM.emit('recall','已刷新 · '+meta.count+' 条真实记忆');
+  }catch(e){
+    WM.emit('gate','刷新失败：'+e.message);
+  }
+}
+
+function wireControls(){
+  const $=(id)=>document.getElementById(id);
+  const pick=()=>mem.length?mem[Math.floor(Math.random()*mem.length)]:null;
+  const idxOf=(m)=>mem.indexOf(m);
+  const nameOf=(m)=>m.s.name||'一颗星';
+
+  const act={
+    write(){const m=pick();if(!m){WM.emit('write','还没有记忆可回放');return;}
+      highlight(idxOf(m));openCard(m.s);WM.emit('write','回放：'+nameOf(m));},
+    recall(){const m=pick();if(!m){WM.emit('recall','星海还空着');return;}
+      highlight(idxOf(m));openCard(m.s);WM.emit('recall','检索命中：'+nameOf(m)+'（本地 0t）');},
+    forget(){
+      if(!mem.length){WM.emit('forget','没有可遗忘的星');return;}
+      // 挑最弱的一条，只做视觉降级（真删要走完整管理页，这里不碰数据）
+      const m=mem.reduce((a,b)=>(b.imp<a.imp?b:a),mem[0]),i=idxOf(m);
+      const cA=memPoints.geometry.attributes.aColor;
+      for(let k=0;k<3;k++){cA.array[i*3+k]*=0.22;origColor[i*3+k]*=0.22;}
+      cA.needsUpdate=true;
+      WM.emit('forget','遗忘：'+nameOf(m)+' salience 降级（不删除）');
+    },
+    gate(){WM.emit('gate','门控：寒暄一句 · 跳过零成本');}
+  };
+
+  function autoStep(){
+    const m=pick();if(!m)return;
+    highlight(idxOf(m));                                   // 自动巡游不弹卡片，别打断看画
+    const seq=[['recall','检索命中：'],['write','回放：'],['gate','门控：寒暄一句 · 跳过']];
+    const [t,pre]=seq[Math.floor(Math.random()*seq.length)];
+    WM.emit(t,pre+nameOf(m));
+  }
+  function setAuto(on){
+    $('bw-auto').classList.toggle('on',on);
+    $('bw-auto').textContent=on?'⏸ 自动巡游':'▶ 继续巡游';
+    if(autoTimer){clearInterval(autoTimer);autoTimer=null;}
+    if(on)autoTimer=setInterval(autoStep,5000);
+  }
+
+  $('bw-write').onclick=()=>act.write();
+  $('bw-recall').onclick=()=>act.recall();
+  $('bw-forget').onclick=()=>act.forget();
+  $('bw-gate').onclick=()=>act.gate();
+  $('bw-auto').onclick=()=>setAuto(!autoTimer);
+  $('bw-refresh').onclick=refreshData;
+  setAuto(true);
+}
+
+function boot(d){
+  galaxy=buildGalaxy();scene.add(galaxy);
+  dustPts=buildDust();scene.add(dustPts);
+  buildOrbits();buildCoreGlow();
+  const meta=applyData(d);
+  WM.emit('recall','已接入真实记忆 · 共 '+meta.count+' 条');
+  document.getElementById('loading').style.display='none';
+  document.getElementById('veil').classList.add('gone');
+  document.getElementById('head').classList.add('in');
+  wireControls();
+  animate();
+}
+fetch(CONFIG.dataUrl+'?d='+Date.now(),{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})
+  .then(g=>boot(graphToGalaxy(g)))
+  .catch((e)=>{ // 接口不通时退回内嵌示例，但要在界面上说清楚，别让人以为这就是自己的记忆
+    console.error('真实数据加载失败',e);
+    try{
+      boot(JSON.parse(document.getElementById('memory-data').textContent));
+      const h=document.getElementById('hint');
+      h.textContent='⚠ 真实记忆加载失败（'+e.message+'），当前是示例数据';
+      h.style.color='#ffb0c8';h.style.opacity='1';
+    }
+    catch(err){ document.getElementById('loading').textContent='星光加载失败，稍后再来 ♡';console.error(err); }
+  });
+</script>
+
+<script>
+(function(){
+  // 面板只在打开时拉一次数据，所以挂个刷新按钮；页面切到后台时顺手整页重载，
+  // 回来就是最新的，但不会打断正在看的人。
+  try {
+    var btn = document.createElement('button');
+    btn.textContent = '⟳ 刷新记忆';
+    btn.title = '重新拉一次 diary';
+    btn.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:2147483647;padding:8px 16px;' +
+      'border-radius:999px;border:1px solid rgba(150,200,255,.4);background:rgba(10,18,32,.82);' +
+      'color:#cfe6ff;font:600 13px "Microsoft YaHei",sans-serif;cursor:pointer;backdrop-filter:blur(6px)';
+    btn.onclick = function(){ location.reload(); };
+    document.body.appendChild(btn);
+    setInterval(function(){ if (document.hidden) location.reload(); }, 120000);
+  } catch (e) { console.warn('[whale-mind] refresh button failed', e); }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>whale-mind · 大肥鱼记忆管理</title>
+<style>
+  :root{--bg:#0b0e14;--fg:#e7e9ee;--card:#151a23;--border:#262d3a;--muted:#8b95a6;--brand:#4ecbff;--bad:#f87171;--ok:#4ade80;--warn:#fbbf24}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.7}
+  .wrap{max-width:900px;margin:0 auto;padding:26px 20px 70px}
+  h1{font-size:20px;margin:0 0 3px}
+  h1 i{font-style:normal;color:var(--brand)}
+  .sub{color:var(--muted);font-size:12.5px}
+  .stats{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-bottom:14px;
+    background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;align-items:center}
+  .stats b{color:#dfe8f2}
+  .sectitle{font-size:13px;font-weight:600;margin:22px 0 8px;color:#dfe9ff}
+  button{font:inherit}
+  .add,.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+  .add textarea{width:100%;min-height:56px;background:#0d1322;color:var(--fg);border:1px solid var(--border);
+    border-radius:8px;padding:8px 10px;font:inherit;resize:vertical}
+  .add .row{display:flex;gap:8px;margin-top:8px;align-items:center}
+  .btn{background:rgba(78,203,255,.12);color:var(--brand);border:1px solid rgba(78,203,255,.35);
+    border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12.5px}
+  .btn:hover{background:rgba(78,203,255,.22)}
+  .btn.ghost{background:transparent;color:#9fb0c8;border-color:var(--border)}
+  .toolbar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+  .toolbar input[type=search]{flex:1;min-width:180px;background:#0d1322;color:var(--fg);border:1px solid var(--border);
+    border-radius:8px;padding:7px 11px;font:inherit}
+  .toolbar select{background:#0d1322;color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:7px 9px;font:inherit}
+  .list{display:flex;flex-direction:column;gap:8px}
+  .mcard{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px}
+  .mcard .h{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+  .mcard .tag{font-size:11px;padding:0 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
+  .mcard .t{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mcard .p{color:#c8d2e2;font-size:13px;white-space:pre-wrap}
+  .mcard .f{display:flex;gap:10px;color:var(--muted);font-size:11.5px;margin-top:4px;align-items:center}
+  .mcard .del{background:rgba(248,113,113,.1);color:var(--bad);border:1px solid rgba(248,113,113,.35);
+    border-radius:8px;padding:3px 10px;font-size:11.5px;cursor:pointer}
+  .danger{background:var(--card);border:1px solid rgba(248,113,113,.4);border-radius:12px;padding:12px 14px}
+  .danger p{color:var(--muted);font-size:12.5px;margin:0 0 10px}
+  .danger input{background:#0d1322;color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font:inherit;width:180px}
+  .danger button{background:rgba(248,113,113,.14);color:var(--bad);border:1px solid rgba(248,113,113,.4);
+    border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12.5px;margin-left:8px}
+  .danger button:disabled{opacity:.4;cursor:not-allowed}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:rgba(9,13,24,.92);
+    border:1px solid rgba(78,203,255,.4);border-radius:10px;padding:9px 18px;font-size:13px;color:#dfe8ff;
+    z-index:9;display:none;max-width:80vw}
+  .empty{color:var(--muted);text-align:center;padding:24px;background:var(--card);border:1px dashed var(--border);border-radius:10px}
+  .pal-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted)}
+  .pill{background:rgba(78,203,255,.1);border:1px solid rgba(78,203,255,.3);color:#bfe9ff;border-radius:999px;padding:1px 10px;font-size:12px}
+  .plist{margin-top:10px;display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:#c8d2e2}
+  .plist div span{color:var(--muted);margin-right:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🐋 大肥鱼记忆管理 <i>· whale-mind</i></h1>
+  <div class="sub">直接读写 whale-mind 引擎的 store（diary JSONL）：删掉的立即从下一轮注入里消失，手记当场生效。</div>
+  <div class="stats" id="stats">加载中…<button class="btn ghost" id="btnRefresh" style="margin-left:auto">⟳ 刷新</button></div>
+
+  <div class="sectitle">🏛 大飞鱼记忆宫殿（dafeiyu-dot）</div>
+  <div class="card">
+    <div class="pal-row" id="palStats">读取中…</div>
+    <div class="plist" id="palList"></div>
+    <div class="row" style="margin-top:10px;display:flex;gap:8px">
+      <button class="btn" id="btnPalSync">⤓ 把日记同步进宫殿</button>
+      <span class="sub" style="align-self:center">每 15 分钟也会自动同步一次</span>
+    </div>
+  </div>
+
+  <div class="sectitle">✍ 写一条手记（当场进海，下一轮就能被想起）</div>
+  <div class="add">
+    <textarea id="noteText" placeholder="第一人称写一句话，比如：主人这周要值夜班，别安排早晨的提醒。"></textarea>
+    <div class="row">
+      <button class="btn" id="btnNote">记进海里</button>
+      <span class="sub" id="noteHint">500 字内 · 存为 note 类型 · salience 0.9</span>
+    </div>
+  </div>
+
+  <div class="sectitle">📚 记忆列表（点删除 = 立即降权出注入）</div>
+  <div class="toolbar">
+    <input type="search" id="q" placeholder="搜一句话、一个词…">
+    <select id="src">
+      <option value="">全部来源</option>
+      <option value="qq">QQ</option>
+      <option value="chat">DSH 对话</option>
+      <option value="import">历史导入</option>
+      <option value="panel">面板手记</option>
+    </select>
+    <span class="sub" id="listCount"></span>
+  </div>
+  <div class="list" id="list"></div>
+
+  <div class="sectitle">📤 导出 / ☄️ 焚毁</div>
+  <div class="danger">
+    <p>导出：把当前全部活跃记忆下载为 JSON（换设备/备份用）。焚毁：<b>不可逆</b>，清空全部记忆文件并写入墓碑——输入「焚毁」两字解锁。</p>
+    <button id="btnExport">📤 导出 JSON</button>
+    <input id="burnConfirm" placeholder="输入：焚毁">
+    <button id="btnBurn" disabled>☄️ 焚毁全部记忆</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const toast = (msg) => {
+    const t = $('toast');
+    t.textContent = msg; t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 3200);
+  };
+  const KIND = { note: '手记', disclosure: '交底', chat: '闲聊', win: '小胜', failure: '搞砸', grievance: '委屈', plan: '约定', event: '事件', pref: '偏好', emotion: '情绪', fact: '事实', lesson: '教训' };
+
+  async function api(path, body) {
+    const r = await fetch(path, body ? {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    } : undefined);
+    return r.json();
+  }
+
+  let all = [];
+
+  async function refresh() {
+    const [s, e] = await Promise.all([api('/whale-mind/state'), api('/whale-mind/export')]);
+    const inj = s.injection ? s.injection.tokens : 0;
+    $('stats').innerHTML =
+      `记忆 <b>${s.count}</b> 条 · 下一轮注入约 <b>${inj}</b> token · 待固化队列 <b>${(s.queue && s.queue.pending) || 0}</b>` +
+      ` · 数据目录 <b>${s.dataDir || '~/.dsh/whale-mind'}</b>` +
+      `<button class="btn ghost" id="btnRefresh" style="margin-left:auto">⟳ 刷新</button>`;
+    $('btnRefresh').onclick = () => { refresh(); toast('已刷新'); };
+    all = [...(e.entries || [])].reverse();
+    render();
+    loadPalace();
+  }
+
+  function render() {
+    const q = $('q').value.trim();
+    const src = $('src').value;
+    let items = all;
+    if (src) items = items.filter((m) => String(m.source || '') === src);
+    if (q) items = items.filter((m) => String(m.text || '').includes(q));
+    $('listCount').textContent = `${items.length} / ${all.length} 条`;
+    const show = items.slice(0, 80);
+    $('list').innerHTML = show.length ? show.map((m) => {
+      const kind = KIND[m.kind] || m.kind || '记忆';
+      const sal = Math.round((m.salience ?? 0.5) * 100);
+      const when = m.date || (m.created_at ? new Date(m.created_at).toLocaleString('zh-CN') : '');
+      return `<div class="mcard">
+        <div class="h"><span class="tag ${m.source || ''}">${kind}${m.source ? ' · ' + m.source : ''}</span>
+        <span class="t"></span><button class="del" data-id="${m.id}">🗑 删除</button></div>
+        <div class="p">${String(m.text || '').replace(/</g, '&lt;')}</div>
+        <div class="f"><span>${when}</span><span>salience ${sal}%</span><span>${m.session ? '来自 ' + m.session : ''}</span></div>
+      </div>`;
+    }).join('') : '<div class="empty">没有符合条件的记忆。</div>';
+    $('list').querySelectorAll('.del').forEach((b) => {
+      b.onclick = async () => {
+        const r = await api('/whale-mind/forget', { id: b.dataset.id });
+        toast(r.ok ? '已删除：' + r.deleted : '失败：' + (r.error || '?'));
+        refresh();
+      };
+    });
+  }
+
+  async function loadPalace() {
+    // 先用老接口（/panel/brain/api/bridge）拿状态：那个路由已经在线，不用重启 DSH。
+    let b = null;
+    try { b = await api('/whale-mind/panel/brain/api/bridge'); } catch { /* ignore */ }
+    // 再试试新接口（能读到分区明细和最近几条）；还没重启时它会 404，就退回去。
+    let p = null;
+    try { p = await api('/whale-mind/palace'); } catch { /* ignore */ }
+    if (p && p.ok) {
+      const sp = p.bySpace || {};
+      $('palStats').innerHTML =
+        `宫殿 <b>${p.count}</b> 条 · ` +
+        `<span class="pill">我眼里的主人 ${sp.owner || 0}</span> ` +
+        `<span class="pill">鲸鱼娘自己的 ${sp.self || 0}</span> ` +
+        `<span class="sub">${p.path || ''}</span>`;
+      $('palList').innerHTML = (p.recent || []).map((m) =>
+        `<div><span>[${m.spaceId === 'self' ? '自己' : '主人'}]</span>${String(m.content || '').replace(/</g, '&lt;')}</div>`
+      ).join('') || '<div>宫殿还是空的，点下面的按钮把日记同步进去。</div>';
+      return;
+    }
+    if (b && b.ok) {
+      $('palStats').innerHTML =
+        `宫殿 <b>${b.total ?? '?'}</b> 条 · 已镜像进星脑 <b>${b.mirrored ?? 0}</b> 条 · ` +
+        `<span class="sub">${(b.hints && b.hints[0]) || ''}</span>`;
+      $('palList').innerHTML = '';
+      return;
+    }
+    $('palStats').textContent = '宫殿状态读取失败';
+  }
+
+  $('btnNote').onclick = async () => {
+    const text = $('noteText').value.trim();
+    if (!text) return toast('先写点什么');
+    const r = await api('/whale-mind/note', { text });
+    toast(r.ok ? '已记下 #' + r.id : '失败：' + (r.error || '?'));
+    if (r.ok) { $('noteText').value = ''; refresh(); }
+  };
+  $('btnPalSync').onclick = async () => {
+    toast('同步中…');
+    let r;
+    try { r = await api('/whale-mind/palace/sync', {}); } catch (e) { r = { ok: false, error: String(e) }; }
+    if (!r || r.ok === undefined) r = { ok: false, error: '接口还没挂上：重启一次 DSH 才会出现（定时任务每 15 分钟也会自动同步）' };
+    toast(r.ok ? ('同步完成：' + ((r.output || '').split('\n').pop() || '')) : ('失败：' + (r.error || '接口未就绪，重启 DSH 后可用')));
+    loadPalace();
+  };
+  $('btnExport').onclick = async () => {
+    const s = await api('/whale-mind/export');
+    const blob = new Blob([JSON.stringify(s, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'whale-mind-export-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    toast('已导出 ' + (s.entries ? s.entries.length : 0) + ' 条');
+  };
+  $('burnConfirm').oninput = (e) => { $('btnBurn').disabled = e.target.value !== '焚毁'; };
+  $('btnBurn').onclick = async () => {
+    const r = await api('/whale-mind/burn', { confirm: true });
+    toast(r.ok ? '☄️ 已焚毁 ' + (r.removed ? r.removed.length : 0) + ' 个文件' : '失败：' + (r.error || '?'));
+    $('burnConfirm').value = ''; $('btnBurn').disabled = true;
+    refresh();
+  };
+  $('q').oninput = render;
+  $('src').onchange = render;
+
+  refresh();
+  setInterval(refresh, 30000);
+})();
+</script>
+</body>
+</html>
