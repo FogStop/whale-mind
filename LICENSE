@@ -1,21 +1,60 @@
-MIT License
+whale-mind License — Non-Commercial
+=====================================
 
-Copyright (c) 2026 whale-mind contributors
+Copyright (c) 2026 FogStop
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+本软件（含源代码、文档、可视化面板，以下称「本软件」）版权归作者所有。
+This software is copyright (c) 2026 FogStop. All rights reserved.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+一、免费使用（非商业）
+----------------------
+以下用途免费，无需事先申请：
+
+1. 个人学习、研究、自用、实验
+2. 教学、学术研究、非营利组织的内部使用
+3. 在非商业项目中修改、合并、分发本软件或其衍生作品
+
+分发时须保留本许可文件与作者署名。
+
+Free for non-commercial use: personal study, research, teaching,
+non-profit projects. Redistribution requires keeping this license
+and the original attribution.
+
+
+二、需要授权（商业）
+--------------------
+以下用途须事先取得作者书面授权：
+
+1. 出售本软件或其衍生作品
+2. 作为付费产品或付费服务的一部分提供（含 SaaS、订阅、按量计费）
+3. 集成进商业产品对外发布
+4. 用于企业内部的生产环境商业运营
+
+未经授权的商业使用视为侵权。
+
+Commercial use requires prior written permission from the author.
+This includes selling, paid products/services, SaaS, bundling into
+commercial products, and commercial production deployment.
+
+
+三、第三方组件
+--------------
+panel/ring.html 与 panel/ring-memory.html 基于 @赛博老爸 的
+「Agent 战术大屏」改造，遵循其原始条款：非商业用途可免费使用，
+商业使用需另行获得原作者授权。
+
+panel/ring.html and panel/ring-memory.html are adapted from
+"Agent 战术大屏" by @赛博老爸 under its original terms:
+free for non-commercial use, commercial use requires the original
+author's separate permission.
+
+
+四、免责
+--------
+本软件按「原样」提供，不附带任何明示或暗示的担保，包括但不限于
+适销性与特定用途适用性。作者不对使用本软件造成的任何损失负责。
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
