@@ -48,5 +48,5 @@ git clone <whale-mind 仓库> whale-mind     # 或复制本目录
 ## 许可
 
 - 记忆星脑：见原仓库
-- 神经星环：**PolyForm Noncommercial 1.0.0**（⚠️ whale-mind 将来 MIT 开源时需取得授权或摘除此板）
+- 神经星环：**PolyForm Noncommercial 1.0.0**（本项目整体同为非商业许可，已符合其条款，可随项目一同分发；商业使用需分别获得授权）
 - 记忆银河：作者公开分享的照搭模板（无明确 LICENSE），个人使用；分发前与作者确认
